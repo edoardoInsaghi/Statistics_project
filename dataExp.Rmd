@@ -22,6 +22,7 @@ color = "plasma" # choose between magma, inferno, plasma, viridis and i think th
 
 library(umap)
 library(caret)
+library(splines)
 ```
 
 
@@ -43,7 +44,7 @@ df$BsmtFinSF1 = log(df$BsmtFinSF1 + 1)
 df$LotArea = log(df$LotArea + 1)
 #df$LowQualFinSF = log(df$LowQualFinSF + 1)
 #df$ScreenPorch = log(df$ScreenPorch + 1)
-#df$X3SsnPorch = log(df$X3SsnPorch + 1)
+df$X3SsnPorch = log(df$X3SsnPorch + 1)
 #df$PoolArea = log(df$PoolArea + 1)
 #df$MiscVal = log(df$MiscVal + 1)
 
@@ -103,7 +104,8 @@ df[] = lapply(df, function(x) {
 exclude = c("Id", "Street", "Utilities", "Condition2", "RoofMatl", 
             "Heating", "GarageQual", "GarageCond")
 excludeNA = c("GarageYrBlt", "Alley", "Fence", "PoolQC", "MiscFeature")
-df = df %>% select(-one_of(c(exclude, excludeNA)))
+df = df %>% select(-one_of(c(exclude, excludeNA))) %>% filter(TotalBsmtSF <= 6000,
+                                                              LotFrontage <= 300) #annoying outlier
 
 
 # check everything works
@@ -135,6 +137,16 @@ p = numdf %>% pivot_longer(names_to="variable", values_to="value", cols=everythi
   theme_bw() + facet_wrap(~variable, scales="free") +
   labs(title="Histogram of the numerical variables")
 p
+
+vars = colnames(numdf)
+
+plots = lapply(vars, function(i){
+  
+  p = ggplot(data=numdf, aes_string(x=i, y="SalePrice")) + geom_point() + 
+    geom_smooth(method="loess") + theme_bw()
+  
+  plot(p)
+})
 ```
 
 ```{r dimensionality reduction}
