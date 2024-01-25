@@ -28,6 +28,7 @@ library(caret)
 ```{r pre processing} 
 df = read.csv("house-prices-advanced-regression-techniques/train.csv")
 summary(df)
+View(df)
 
 # NA
 nas = colSums(is.na(df))
@@ -182,7 +183,7 @@ disp
 # the linear models will suck
 
 # this plots helps to understand how each variable contributes to the first ndim 
-# components, and their correlations, since simlar variables tend to contribute
+# components, and their correlations, since similar variables tend to contribute
 # to the same directions. I still need to find a way to put a number
 # in the legend and x axis to identify the variables
 loadings = as.data.frame(pca$rotation[,1:ndim])
