@@ -265,6 +265,82 @@ m = ggcorrplot(mat) + labs(title="Mutual Information Matrix")
 m
 ```
 
+```{r first sketches for linear models}
+library(corrplot)
+library(car)
+library(MASS)
+
+num_vars = df %>% select_if(is.numeric)
+
+corr_matrix = cor(num_vars)
+corrplot(corr_matrix, method = "color")
+
+#let's now use only numerical variables
+
+first_lin_model = lm(SalePrice ~ OverallQual + GrLivArea, num_vars) #simple model with just 2 "highly correlated" covariates
+summary(first_lin_model)
+
+first_lin_model = lm(SalePrice ~ OverallQual + GrLivArea + FullBath, num_vars) #we can see the model does not improve; in fact, FullBath is highly correlated to GrLivArea
+summary(first_lin_model)
+
+complete_model = lm(SalePrice ~ ., num_vars) #model with all covariates
+
+final_model <- stepAIC(complete_model, direction = "both", trace = F) #stepAIC for model selection starting from the model with all the covariates
+
+summary(final_model) #print final model's info
+plot(final_model)
+
+vif(final_model) #find covariates with VIF>10 to exclude them
+
+intercept_model = lm(SalePrice ~ 1, num_vars) #model with just the intercept
+
+
+#let's now consider the categorical variables as well
+
+#let's first select and use only the categorical covariates
+
+catdf = df %>% select_if(~!is.numeric(.))
+catdf$SalePrice = df$SalePrice
+
+first_cat_model = lm(SalePrice ~ BsmtQual, catdf) #simple model with just a covariate, which, by looking at the scatterplots, seems a nice one to start with
+summary(first_cat_model)
+
+complete_cat_model = lm(SalePrice ~ ., catdf) #model with all categorical covariates
+
+final_cat_model <- stepAIC(complete_cat_model, direction = "both", trace = F) #stepAIC for model selection starting from 
+
+summary(final_cat_model) #print final model's info
+plot(final_cat_model)
+
+vif(final_cat_model) #find covariates with VIF>10 to exclude them
+#Seems reasonable to exclude Neighborhood
+
+
+#what if we use all the variables?
+complete_model_all = lm(SalePrice ~ ., df) #model with all covariates
+
+final_model_all <- stepAIC(complete_model_all, direction = "both", trace = F) #stepAIC for model selection starting from the model with all the covariates
+
+summary(final_model_all) #print final model's info
+plot(final_model_all)
+
+vif(final_model_all) #find covariates with VIF>10 to exclude them
+
+
+#COMPUTATIONALLY TO HEAVY BUT WE TRIED THIS AS WELL
+#let's try another method as well
+library(leaps)
+
+# Generate all possible model combinations
+all_models <- regsubsets(SalePrice ~ ., df, nvmax = ncol(df) - 1, method = "exhaustive", really.big = TRUE)
+# Find the model with the minimum AIC
+best_model <- which.min(all_models$aic)
+# Extract the variables in the best model
+best_variables <- names(coef(all_models, id = best_model))
+# Fit the best model
+final_model <- lm(SalePrice ~ ., df[, c("SalePrice", best_variables)])
+
+```
 
 
 
