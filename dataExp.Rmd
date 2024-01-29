@@ -315,7 +315,7 @@ plot(final_cat_model)
 vif(final_cat_model) #find covariates with VIF>10 to exclude them
 #Seems reasonable to exclude Neighborhood
 
-#let's start serious stuff
+#let's start more serious stuff
 #what if we use all the variables?
 complete_model_all = lm(SalePrice ~ ., df) #model with all covariates
 
@@ -337,7 +337,7 @@ model_variables = attr(model_terms, "term.labels")
 print(model_variables)
 
 # Select variables to exclude from the final model by looking at the VIFs
-# We choose to exlude the variable with the highest VIF
+# We choose to exclude the variables with high VIF
 variables_to_exclude = c("BsmtFinType2")
 
 # Create a new formula with selected variables
@@ -434,11 +434,12 @@ print(anova_result)
 
 # according to the ANOVA test, it seems that the more complex model should be better
 
+# ok these were some tests and attempts, now let's try to find the best model, hence the best combination of covariates to use for the linear models, with a more efficient and proficient way
 
 #!!!!!!!!!!!!
 #Definitive linear model approach
-#let's try another approach: exclude first the most correlated variables (really high correlation) from the dataset (by looking at the correlation matrix and the mutual information matrix) and then use the remaining variables to find the best model with stepAIC
-complete_model_all = lm(SalePrice ~ ., df) #model with all covariates
+#let's try another approach: exclude first the most correlated variables (really high correlation) from the dataset (by looking at the correlation matrix and the mutual information matrix) and then use the remaining variables to find the best model with the stepAIC procedure
+complete_model_all = lm(SalePrice ~ ., df) #model with all covariates, categorical and numerical
 summary(complete_model_all)
 # Extracting variables from the model
 model_formula = formula(complete_model_all)
