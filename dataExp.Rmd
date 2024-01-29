@@ -99,15 +99,12 @@ df[] = lapply(df, function(x) {
   return(x)
 })
 
-
-
 # Removing very imbalanced covariates and also some values full of NA 
 exclude = c("Id", "Street", "Utilities", "Condition2", "RoofMatl", 
             "Heating", "GarageQual", "GarageCond")
 excludeNA = c("GarageYrBlt", "Alley", "Fence", "PoolQC", "MiscFeature")
 df = df %>% select(-one_of(c(exclude, excludeNA))) %>% filter(TotalBsmtSF <= 6000,
                                                               LotFrontage <= 300) #annoying outlier
-
 
 # check everything works
 #summary(df)
@@ -455,6 +452,7 @@ final_model = stepAIC(complete_model, direction = "both", trace = F) #stepAIC fo
 summary(final_model) #print final model's info and check VIF
 plot(final_model)
 vif(final_model) # all <5
+hist(final_model$residuals)
 
 # Extracting variables from the final model
 model_formula = formula(final_model)
@@ -502,6 +500,7 @@ new_final_model = stepAIC(try_model, direction = "both", trace = F)
 summary(new_final_model) #print final model's info and check VIF
 plot(new_final_model)
 vif(new_final_model) # all <5
+hist(new_final_model$residuals)
 
 # Extracting variables from the final model
 model_formula = formula(new_final_model)
@@ -523,23 +522,6 @@ best_model <- glmnet(x, y, alpha = 1, lambda = best_lambda)
 coef(best_model)
 # all the coefficients are different from zero, so with new_final_model we obtained the best model so far: it has good performance (comparable with the others) in terms of adjusted R^2 and it is the simplest model (less covariates), avoiding multicollinearity
 
-
-#COMPUTATIONALLY TOO HEAVY BUT WE TRIED THIS AS WELL
-#let's try another method as well
-#library(leaps)
-
-# Generate all possible model combinations
-
-#all_models <- regsubsets(SalePrice ~ ., df, nvmax = ncol(df) - 1, method = "exhaustive", really.big = TRUE)
-
-# Find the model with the minimum AIC
-#best_model <- which.min(all_models$aic)
-
-# Extract the variables in the best model
-#best_variables <- names(coef(all_models, id = best_model))
-
-# Fit the best model
-#final_model <- lm(SalePrice ~ ., df[, c("SalePrice", best_variables)])
 
 ```
 
@@ -617,7 +599,6 @@ df_test[] = lapply(df_test, function(x) {
 })
 
 
-
 # Removing very imbalanced covariates and also some values full of NA 
 exclude = c("Id", "Street", "Utilities", "Condition2", "RoofMatl", 
             "Heating", "GarageQual", "GarageCond")
@@ -632,13 +613,18 @@ total_na = sum(is.na(df_test)) # no more NAs
 ```
 
 ```{r test with the selected linear model}
-selected_test_data <- df_test[, c("LotArea","LotShape", "LandContour", "LandSlope", "Condition1", "BldgType", "OverallQual", "YearBuilt", "YearRemodAdd", "RoofStyle", "BsmtExposure", "BsmtFinSF1", "BsmtFinSF2", "TotalBsmtSF", "HeatingQC", "LowQualFinSF", "GrLivArea", "BsmtFullBath", "BedroomAbvGr", "KitchenAbvGr", "KitchenQual", "Functional", "Fireplaces", "GarageFinish", "GarageArea", "WoodDeckSF", "ScreenPorch", "PoolArea", "MoSold", "SaleCondition")]
+library(Metrics)
+
+selected_test_data = df_test[, c("LotArea", "LandSlope", "Condition1", "BldgType", "OverallQual", "YearBuilt", "YearRemodAdd", "RoofStyle", "BsmtExposure", "BsmtFinSF1", "BsmtFinSF2", "TotalBsmtSF", "HeatingQC", "LowQualFinSF", "GrLivArea", "BsmtFullBath", "BedroomAbvGr", "KitchenAbvGr", "KitchenQual", "Functional", "Fireplaces", "GarageArea", "WoodDeckSF", "ScreenPorch", "PoolArea")]
 
 # Make predictions using the trained final model we choosed
-predictions <- predict(final_model, newdata = selected_test_data)
+predictions = predict(new_final_model, newdata = selected_test_data)
 print(predictions)
 
-# I can't find the SalePrice values in the test data to evaluate the predictions :(
+real_value = read.csv("house-prices-advanced-regression-techniques/sample_submission.csv")
+real_value = real_value$SalePrice
+
+
 ```
 
 
