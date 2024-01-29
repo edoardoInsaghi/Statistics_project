@@ -285,7 +285,7 @@ summary(first_lin_model)
 
 complete_model = lm(SalePrice ~ ., num_vars) #model with all covariates
 
-final_model <- stepAIC(complete_model, direction = "both", trace = F) #stepAIC for model selection starting from the model with all the covariates
+final_model = stepAIC(complete_model, direction = "both", trace = F) #stepAIC for model selection starting from the model with all the covariates
 
 summary(final_model) #print final model's info
 plot(final_model)
@@ -307,7 +307,7 @@ summary(first_cat_model)
 
 complete_cat_model = lm(SalePrice ~ ., catdf) #model with all categorical covariates
 
-final_cat_model <- stepAIC(complete_cat_model, direction = "both", trace = F) #stepAIC for model selection starting from 
+final_cat_model = stepAIC(complete_cat_model, direction = "both", trace = F) #stepAIC for model selection starting from 
 
 summary(final_cat_model) #print final model's info
 plot(final_cat_model)
@@ -315,35 +315,330 @@ plot(final_cat_model)
 vif(final_cat_model) #find covariates with VIF>10 to exclude them
 #Seems reasonable to exclude Neighborhood
 
-
+#let's start serious stuff
 #what if we use all the variables?
 complete_model_all = lm(SalePrice ~ ., df) #model with all covariates
 
-final_model_all <- stepAIC(complete_model_all, direction = "both", trace = F) #stepAIC for model selection starting from the model with all the covariates
+final_model_all = stepAIC(complete_model_all, direction = "both", trace = F) #stepAIC for model selection starting from the model with all the covariates
 
 summary(final_model_all) #print final model's info
 plot(final_model_all)
 
-vif(final_model_all) #find covariates with VIF>10 to exclude them
+# Now starting from this model given by the stepAIC function, let's try to improve it
+
+vif(final_model_all) #find covariates with VIF>10 to exclude them from the model
+
+# Extracting variables from the final model
+model_formula = formula(final_model_all)
+model_terms = terms(model_formula)
+model_variables = attr(model_terms, "term.labels")
+
+# Display the extracted variables
+print(model_variables)
+
+# Select variables to exclude from the final model by looking at the VIFs
+# We choose to exlude the variable with the highest VIF
+variables_to_exclude = c("BsmtFinType2")
+
+# Create a new formula with selected variables
+selected_formula = as.formula(paste("SalePrice ~", paste(setdiff(model_variables, variables_to_exclude), collapse = " + ")))
+
+# Fit a new model using the selected variables
+new_model = lm(selected_formula, df)
+# Display the summary of the new model
+summary(new_model)
+plot(new_model)
+vif(new_model)
+
+# Compare the two nested models using anova
+anova_result = anova(new_model, final_model_all)
+# Print the ANOVA table
+print(anova_result)
+
+# seems then reasonable to remove BsmtFinType2, since in this way we remove high VIF values and the ANOVA test suggests us to use the simpler model which doesn't include it
+
+# by looking at the mutual information matrix, ExterQual seems correlated to KitchenQual, let's try to remove ExterQual
+# Extracting variables from the final model
+model_formula = formula(new_model)
+model_terms = terms(model_formula)
+model_variables = attr(model_terms, "term.labels")
+variables_to_exclude = c("ExterQual")
+
+# Create a new formula with selected variables
+selected_formula = as.formula(paste("SalePrice ~", paste(setdiff(model_variables, variables_to_exclude), collapse = " + ")))
+
+# Fit a new model using the selected variables
+new_model2 = lm(selected_formula, df)
+# Display the summary of the new model
+summary(new_model2)
+plot(new_model2)
+vif(new_model2)
+
+# Compare the two nested models using anova
+anova_result = anova(new_model2, new_model)
+# Print the ANOVA table
+print(anova_result)
+
+# according to the ANOVA test, it seems that ExterQual is indeed significant in the model, so let's keep it for now
+
+# by looking at the VIF index and the mutual information matrix, SaleType and SaleCondition are very correlated to each other, let's remove one of them from the model new_model
+
+# Extracting variables from the final model
+model_formula = formula(new_model)
+model_terms = terms(model_formula)
+model_variables = attr(model_terms, "term.labels")
+variables_to_exclude = c("SaleType")
+
+# Create a new formula with selected variables
+selected_formula = as.formula(paste("SalePrice ~", paste(setdiff(model_variables, variables_to_exclude), collapse = " + ")))
+
+# Fit a new model using the selected variables
+new_model2 = lm(selected_formula, df)
+# Display the summary of the new model
+summary(new_model2)
+plot(new_model2)
+vif(new_model2)
+
+# Compare the two nested models using anova
+anova_result = anova(new_model2, new_model)
+# Print the ANOVA table
+print(anova_result)
+
+# according to the ANOVA test, it seems that the more complex model should be better but not that much: let's then remove SaleType
+
+# here are our covariates now
+# Extracting variables from the final model
+model_formula = formula(new_model2)
+model_terms = terms(model_formula)
+model_variables = attr(model_terms, "term.labels")
+# Display the extracted variables
+print(model_variables)
+
+# by looking at the correlation matrix, GarageCars and GarageArea are very correlated to each other, let's remove GarageCars
+variables_to_exclude = c("GarageCars")
+
+# Create a new formula with selected variables
+selected_formula = as.formula(paste("SalePrice ~", paste(setdiff(model_variables, variables_to_exclude), collapse = " + ")))
+
+# Fit a new model using the selected variables
+new_model2 = lm(selected_formula, df)
+# Display the summary of the new model
+summary(new_model2)
+plot(new_model2)
+vif(new_model2)
+
+# Compare the two nested models using anova
+anova_result = anova(new_model2, new_model)
+# Print the ANOVA table
+print(anova_result)
+
+# according to the ANOVA test, it seems that the more complex model should be better
 
 
-#COMPUTATIONALLY TO HEAVY BUT WE TRIED THIS AS WELL
+#!!!!!!!!!!!!
+#Definitive linear model approach
+#let's try another approach: exclude first the most correlated variables (really high correlation) from the dataset (by looking at the correlation matrix and the mutual information matrix) and then use the remaining variables to find the best model with stepAIC
+complete_model_all = lm(SalePrice ~ ., df) #model with all covariates
+summary(complete_model_all)
+# Extracting variables from the model
+model_formula = formula(complete_model_all)
+model_terms = terms(model_formula)
+model_variables = attr(model_terms, "term.labels")
+variables_to_exclude = c("SaleType", "GarageType", "ExterQual", "BsmtQual", "Neighborhood", "GarageCars", "MSSubClass", "LotFrontage", "OverallCond", "BsmtUnfSF", "X1stFlrSF", "TotRmsAbvGrd", "MasVnrType", "BsmtFinType2")
+# Create a new formula with selected variables
+selected_formula = as.formula(paste("SalePrice ~", paste(setdiff(model_variables, variables_to_exclude), collapse = " + ")))
+
+complete_model = lm(selected_formula, df) #model with all remaining covariates
+
+final_model = stepAIC(complete_model, direction = "both", trace = F) #stepAIC for model selection starting from the model with all the remaining covariates
+summary(final_model) #print final model's info and check VIF
+plot(final_model)
+vif(final_model) # all <5
+
+# Extracting variables from the final model
+model_formula = formula(final_model)
+model_terms = terms(model_formula)
+model_variables = attr(model_terms, "term.labels")
+# Display the extracted variables
+print(model_variables)
+
+# this model seems to be the best overall, since it doesn't have multicollinearity problems, has a good R^2 (even adjusted), almost equal to the one obtained with the other approach and is simpler, since it has less covariates
+
+# let's test it against the complete model (all remaining covariates after removing the correlated ones)
+anova_result = anova(final_model, complete_model)
+# Print the ANOVA table
+print(anova_result)
+
+# the simpler model, with the covariates selected using the AIC as criteria, is the one to choose, since it has a good balance between performance and complexity
+
+# interaction terms would decrease the interpretability of the model and its complexity, so I think that there is no point to ass them, since the performance of the model is already good and adding interaction could cause overfitting and multi-collinearity problems
+
+
+# let's try to fit a LASSO model to see if we can remove some more covariates from the model shrinking them to zero
+library(glmnet)
+#define response variable
+y <- df$SalePrice
+#define matrix of predictor variables
+x <- data.matrix(df[, model_variables])
+#perform k-fold cross-validation to find optimal lambda value
+cv_model <- cv.glmnet(x, y, alpha = 1)
+#find optimal lambda value that minimizes test MSE
+best_lambda <- cv_model$lambda.min
+#produce plot of test MSE by lambda value
+plot(cv_model)
+#find coefficients of best model
+best_model <- glmnet(x, y, alpha = 1, lambda = best_lambda)
+coef(best_model)
+# seems that we can remove from the model the following covariates: LotShape, LandContour, GarageFinish, SaleCondition
+# let's try to fit a  new linear model removing these covariates then
+variables_to_exclude = c("LotShape", "LandContour", "GarageFinish", "SaleCondition")
+# Create a new formula with selected variables
+selected_formula = as.formula(paste("SalePrice ~", paste(setdiff(model_variables, variables_to_exclude), collapse = " + ")))
+
+try_model = lm(selected_formula, df)
+# let's again perform stepAIC to find the best model and maybe remove other more covariates
+new_final_model = stepAIC(try_model, direction = "both", trace = F)
+summary(new_final_model) #print final model's info and check VIF
+plot(new_final_model)
+vif(new_final_model) # all <5
+
+# Extracting variables from the final model
+model_formula = formula(new_final_model)
+model_terms = terms(model_formula)
+model_variables = attr(model_terms, "term.labels")
+# Display the extracted variables
+print(model_variables)
+
+# Let's try LASSO again with these variables
+x <- data.matrix(df[, model_variables])
+#perform k-fold cross-validation to find optimal lambda value
+cv_model <- cv.glmnet(x, y, alpha = 1)
+#find optimal lambda value that minimizes test MSE
+best_lambda <- cv_model$lambda.min
+#produce plot of test MSE by lambda value
+plot(cv_model)
+#find coefficients of best model
+best_model <- glmnet(x, y, alpha = 1, lambda = best_lambda)
+coef(best_model)
+# all the coefficients are different from zero, so with new_final_model we obtained the best model so far: it has good performance (comparable with the others) in terms of adjusted R^2 and it is the simplest model (less covariates), avoiding multicollinearity
+
+
+#COMPUTATIONALLY TOO HEAVY BUT WE TRIED THIS AS WELL
 #let's try another method as well
-library(leaps)
+#library(leaps)
 
 # Generate all possible model combinations
-all_models <- regsubsets(SalePrice ~ ., df, nvmax = ncol(df) - 1, method = "exhaustive", really.big = TRUE)
+
+#all_models <- regsubsets(SalePrice ~ ., df, nvmax = ncol(df) - 1, method = "exhaustive", really.big = TRUE)
+
 # Find the model with the minimum AIC
-best_model <- which.min(all_models$aic)
+#best_model <- which.min(all_models$aic)
+
 # Extract the variables in the best model
-best_variables <- names(coef(all_models, id = best_model))
+#best_variables <- names(coef(all_models, id = best_model))
+
 # Fit the best model
-final_model <- lm(SalePrice ~ ., df[, c("SalePrice", best_variables)])
+#final_model <- lm(SalePrice ~ ., df[, c("SalePrice", best_variables)])
 
 ```
 
+```{r pre processing on test data}
+df_test = read.csv("house-prices-advanced-regression-techniques/test.csv")
+summary(df_test)
+View(df_test)
+
+# NA
+nas = colSums(is.na(df_test))
+nas
+
+# numerical var pre processing, some are commented out because log transforming does not
+# really help with zero inflation
+df_test$LotFrontage = ifelse(is.na(df_test$LotFrontage), mean(df_test$LotFrontage, na.rm=T), df_test$LotFrontage)
+df_test$MasVnrArea = ifelse(is.na(df_test$MasVnrArea), mean(df_test$MasVnrArea, na.rm=T), df_test$MasVnrArea)
+df_test$MasVnrArea = log(df_test$MasVnrArea + 1)
+df_test$BsmtFinSF2 = log(df_test$BsmtFinSF2 + 1)
+df_test$BsmtFinSF1 = log(df_test$BsmtFinSF1 + 1)
+df_test$LotArea = log(df_test$LotArea + 1)
+#df$LowQualFinSF = log(df$LowQualFinSF + 1)
+#df$ScreenPorch = log(df$ScreenPorch + 1)
+df_test$X3SsnPorch = log(df_test$X3SsnPorch + 1)
+#df$PoolArea = log(df$PoolArea + 1)
+#df$MiscVal = log(df$MiscVal + 1)
 
 
+# categorical variables, we have many variables with hundreds of unique values
+# i am grouping together less frequent values; if there are few NA i am grouping
+# them together with the new group, which will always be "other". i am excluding
+# overly imbalanced variables (also debatable)
+df_test = df_test %>%
+  mutate(MSZoning = fct_lump(MSZoning, n = 2, other_level = "other"),
+         LotShape = fct_lump(LotShape, n = 2, other_level = "other"),
+         LandContour = fct_lump(LandContour, n = 3, other_level = "other"),
+         LotConfig = fct_lump(LotConfig, n = 2, other_level = "other"),
+         LandSlope = fct_lump(LandSlope, n = 2, other_level = "other"),
+         Neighborhood = fct_lump(Neighborhood, n = 5, other_level = "other"),
+         Condition1 = fct_lump(Condition1, n = 2, other_level = "other"),
+         BldgType = fct_lump(BldgType, n = 2, other_level = "other"),
+         HouseStyle = fct_lump(HouseStyle, n = 4, other_level = "other"),
+         RoofStyle = fct_lump(RoofStyle, n = 2, other_level = "other"),
+         Exterior1st = fct_lump(Exterior1st, n = 4, other_level = "other"),
+         Exterior2nd = fct_lump(Exterior2nd, n = 4, other_level = "other"),
+         MasVnrType = fct_lump(MasVnrType, n = 4, other_level = "other"),
+         MasVnrType = fct_explicit_na(MasVnrType, na_level = "other"), # otherwise NA do weird stuff
+         ExterQual = fct_lump(ExterQual, n = 4, other_level = "other"),
+         ExterCond = fct_lump(ExterCond, n = 2, other_level = "other"),
+         Foundation = fct_lump(Foundation, n = 2, other_level = "other"),
+         BsmtQual = fct_lump(BsmtQual, n = 3, other_level = "other"),
+         BsmtCond = fct_lump(BsmtCond, n = 2, other_level = "other"),
+         BsmtExposure = fct_lump(BsmtExposure, n = 2, other_level = "other"),
+         BsmtFinType1 = fct_lump(BsmtFinType1, n = 3, other_level = "other"),
+         BsmtFinType2 = fct_lump(BsmtFinType2, n = 2, other_level = "other"),
+         HeatingQC = fct_lump(HeatingQC, n = 3, other_level = "other"),
+         Electrical = fct_lump(Electrical, n = 2, other_level = "other"),
+         KitchenQual = fct_lump(KitchenQual, n = 3, other_level = "other"),
+         Functional = fct_lump(Functional, n = 2, other_level = "other"),
+         FireplaceQu = ifelse(Fireplaces == 0, as.character(0), as.character(FireplaceQu)),
+         FireplaceQu = fct_lump(FireplaceQu, n = 3, other_level = "other"),
+         GarageType = fct_lump(GarageType, n = 2, other_level = "other"),
+         GarageFinish = fct_lump(GarageFinish, n = 3, other_level = "other"),
+         GarageFinish = fct_explicit_na(GarageFinish, na_level = "other"), # otherwise NA do weird stuff
+         PavedDrive = fct_lump(PavedDrive, n = 2, other_level = "other"),
+         Electrical = fct_lump(Electrical, n = 2, other_level = "other"),
+         SaleType = fct_lump(SaleType, n = 3, other_level = "other"),
+         SaleCondition = fct_lump(SaleCondition, n = 2, other_level = "other")
+         )
+
+df_test[] = lapply(df_test, function(x) {
+  if (is.factor(x) || is.character(x)) {
+    x[is.na(x)] = "other"
+  }
+  return(x)
+})
+
+
+
+# Removing very imbalanced covariates and also some values full of NA 
+exclude = c("Id", "Street", "Utilities", "Condition2", "RoofMatl", 
+            "Heating", "GarageQual", "GarageCond")
+excludeNA = c("GarageYrBlt", "Alley", "Fence", "PoolQC", "MiscFeature")
+
+
+# check everything works
+#summary(df)
+nas = colSums(is.na(df_test))
+#nas
+total_na = sum(is.na(df_test)) # no more NAs
+```
+
+```{r test with the selected linear model}
+selected_test_data <- df_test[, c("LotArea","LotShape", "LandContour", "LandSlope", "Condition1", "BldgType", "OverallQual", "YearBuilt", "YearRemodAdd", "RoofStyle", "BsmtExposure", "BsmtFinSF1", "BsmtFinSF2", "TotalBsmtSF", "HeatingQC", "LowQualFinSF", "GrLivArea", "BsmtFullBath", "BedroomAbvGr", "KitchenAbvGr", "KitchenQual", "Functional", "Fireplaces", "GarageFinish", "GarageArea", "WoodDeckSF", "ScreenPorch", "PoolArea", "MoSold", "SaleCondition")]
+
+# Make predictions using the trained final model we choosed
+predictions <- predict(final_model, newdata = selected_test_data)
+print(predictions)
+
+# I can't find the SalePrice values in the test data to evaluate the predictions :(
+```
 
 
 
