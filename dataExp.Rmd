@@ -29,7 +29,7 @@ library(splines)
 ```{r pre processing} 
 df = read.csv("house-prices-advanced-regression-techniques/train.csv")
 summary(df)
-View(df)
+#View(df)
 
 # NA
 nas = colSums(is.na(df))
@@ -98,7 +98,10 @@ df[] = lapply(df, function(x) {
   }
   return(x)
 })
-
+#install.packages("conflicted")
+library(conflicted)
+conflict_prefer("select", "dplyr")
+conflict_prefer("filter", "dplyr")
 # Removing very imbalanced covariates and also some values full of NA 
 exclude = c("Id", "Street", "Utilities", "Condition2", "RoofMatl", 
             "Heating", "GarageQual", "GarageCond")
@@ -452,7 +455,7 @@ final_model = stepAIC(complete_model, direction = "both", trace = F) #stepAIC fo
 summary(final_model) #print final model's info and check VIF
 plot(final_model)
 vif(final_model) # all <5
-hist(final_model$residuals)
+hist(final_model$residuals, probability=T)
 
 # Extracting variables from the final model
 model_formula = formula(final_model)
@@ -625,6 +628,83 @@ real_value = read.csv("house-prices-advanced-regression-techniques/sample_submis
 real_value = real_value$SalePrice
 
 
+```
+
+
+
+```{r gam model}
+library(mgcv)
+spline_model = gam(formula = SalePrice ~ LotArea + LandSlope + Condition1 + BldgType + 
+    s(OverallQual) + s(YearBuilt) + s(YearRemodAdd) + RoofStyle + BsmtExposure + 
+    s(BsmtFinSF1) + BsmtFinSF2 + TotalBsmtSF + HeatingQC + LowQualFinSF + s(TotRmsAbvGrd) + 
+    GrLivArea + BedroomAbvGr +  KitchenQual + Functional + Fireplaces + s(GarageArea) + 
+    s(ScreenPorch) + s(MasVnrArea) + s(X1stFlrSF) + s(X2ndFlrSF) + BsmtQual + CentralAir,
+    data = df)
+
+summary(spline_model)
+```
+
+```{r compare models}
+
+linear_model = lm(SalePrice ~ LotArea + LandSlope + Condition1 + BldgType + OverallQual + 
+    RoofStyle + BsmtExposure + BsmtFinSF1 + BsmtFinSF2 + TotalBsmtSF + HeatingQC + LowQualFinSF +
+    GrLivArea + BsmtFullBath + BedroomAbvGr + KitchenAbvGr + KitchenQual + Functional + Fireplaces +  
+    GarageArea + WoodDeckSF + ScreenPorch + PoolArea + YearBuilt + YearRemodAdd,
+    data=df)
+summary(linear_model)
+
+gam_model = gam(formula = SalePrice ~ LotArea + LandSlope + Condition1 + BldgType + 
+    s(OverallQual) + s(YearBuilt) + s(YearRemodAdd) + RoofStyle + BsmtExposure + 
+    s(BsmtFinSF1) + BsmtFinSF2 + TotalBsmtSF + HeatingQC + LowQualFinSF + s(TotRmsAbvGrd) + 
+    GrLivArea + BedroomAbvGr +  KitchenQual + Functional + Fireplaces + s(GarageArea) + 
+    s(ScreenPorch) + s(MasVnrArea) + s(X1stFlrSF) + s(X2ndFlrSF) + BsmtQual + CentralAir,
+    data = df)
+summary(gam_model)
+
+
+# K fold CV
+
+numfolds = 10
+cv = createFolds(df$SalePrice, k=numfolds, list=TRUE)
+
+mse_linear = vector(mode="numeric", length=numfolds)
+mse_gam = vector(mode="numeric", length=numfolds)
+
+for (fold in 1:numfolds){
+  
+  train_idx = unlist(cv[-fold])
+  test_idx = unlist(cv[fold])
+  
+  train = df[train_idx, ]
+  test = df[test_idx, ]
+  
+  linear_model = lm(SalePrice ~ LotArea + LandSlope + Condition1 + BldgType + OverallQual + 
+    RoofStyle + BsmtExposure + BsmtFinSF1 + BsmtFinSF2 + TotalBsmtSF + HeatingQC + LowQualFinSF +
+    GrLivArea + BsmtFullBath + BedroomAbvGr + KitchenAbvGr + KitchenQual + Functional + Fireplaces +  
+    GarageArea + WoodDeckSF + ScreenPorch + PoolArea + YearBuilt + YearRemodAdd,
+    data=train)
+  
+  gam_model = gam(formula = SalePrice ~ LotArea + LandSlope + Condition1 + BldgType + 
+    s(OverallQual) + s(YearBuilt) + s(YearRemodAdd) + RoofStyle + BsmtExposure + 
+    s(BsmtFinSF1) + BsmtFinSF2 + TotalBsmtSF + HeatingQC + LowQualFinSF + s(TotRmsAbvGrd) + 
+    GrLivArea + BedroomAbvGr +  KitchenQual + Functional + Fireplaces + s(GarageArea) + 
+    s(ScreenPorch) + s(MasVnrArea) + s(X1stFlrSF) + s(X2ndFlrSF) + BsmtQual + CentralAir,
+    data=train)
+  
+  lm_predictions = predict(linear_model, newdata=test)
+  gam_predictions = predict(gam_model, newdata=test)
+  
+  linear_rmse <- sqrt(mean((test$SalePrice - lm_predictions)^2))
+  gam_rmse <- sqrt(mean((test$SalePrice - gam_predictions)^2))
+  
+  mse_linear[fold] = linear_rmse
+  mse_gam[fold] = gam_rmse  
+}
+
+res = data.frame("rmse" = c(mse_linear, mse_gam),
+                 "model" = c(rep("Linear", numfolds), rep("Gam", numfolds)))
+
+res %>% ggplot(aes(y=rmse, x=model, fill=model)) + geom_boxplot()
 ```
 
 
