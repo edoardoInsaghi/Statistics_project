@@ -530,8 +530,8 @@ coef(best_model)
 
 ```{r pre processing on test data}
 df_test = read.csv("house-prices-advanced-regression-techniques/test.csv")
-summary(df_test)
-View(df_test)
+# summary(df_test)
+# View(df_test)
 
 # NA
 nas = colSums(is.na(df_test))
@@ -622,7 +622,7 @@ selected_test_data = df_test[, c("LotArea", "LandSlope", "Condition1", "BldgType
 
 # Make predictions using the trained final model we choosed
 predictions = predict(new_final_model, newdata = selected_test_data)
-print(predictions)
+# print(predictions)
 
 real_value = read.csv("house-prices-advanced-regression-techniques/sample_submission.csv")
 real_value = real_value$SalePrice
@@ -642,6 +642,127 @@ spline_model = gam(formula = SalePrice ~ LotArea + LandSlope + Condition1 + Bldg
     data = df)
 
 summary(spline_model)
+```
+
+```{r nn model}
+library(keras)
+
+set.seed(42)
+
+nn_variables <- c(
+  "LotArea", "LandSlope", "Condition1", "BldgType",
+  "OverallQual", "YearBuilt", "YearRemodAdd", "RoofStyle", "BsmtExposure",
+  "BsmtFinSF1", "BsmtFinSF2", "TotalBsmtSF", "HeatingQC", "LowQualFinSF", "TotRmsAbvGrd",
+  "GrLivArea", "BedroomAbvGr", "KitchenQual", "Functional", "Fireplaces", "GarageArea",
+  "ScreenPorch", "MasVnrArea", "X1stFlrSF", "X2ndFlrSF", "BsmtQual", "CentralAir"
+)
+
+
+# Extract the relevant columns from the dataframe
+selected_columns <- c(nn_variables, "SalePrice")
+selected_data <- df[, selected_columns, drop = FALSE]
+# selected_data <- df
+
+# If you uncomment scaling you can remove this
+# Extracting numerical and categorical columns
+numeric_columns <- sapply(selected_data, is.numeric)
+numeric_data <- selected_data[, numeric_columns, drop = FALSE]
+categorical_data <- selected_data[, !numeric_columns, drop = FALSE]
+
+numeric_data <- numeric_data[, !colnames(numeric_data) %in% "SalePrice", drop = FALSE]
+numeric_data <- (as.matrix(numeric_data) - min(numeric_data)) / (max(numeric_data) - min(numeric_data))
+
+# Convert categorical variables to onehot encoding
+one_hot_encoded <- lapply(categorical_data, function(col) model.matrix(~ col - 1, data = data.frame(col)))
+
+# Combine numerical and categorical data
+train_data_nn <- as.matrix(cbind(numeric_data, do.call(cbind, one_hot_encoded)))
+train_labels <- (as.matrix(selected_data$SalePrice) - min(selected_data$SalePrice)) / (max(selected_data$SalePrice) - min(selected_data$SalePrice))
+
+
+build_model <- function() {
+  
+  model <- keras_model_sequential() %>%
+  layer_dense(units = 32, input_shape = dim(train_data_nn)[2]) %>%
+  layer_batch_normalization() %>%
+  layer_activation("sigmoid") %>%
+  
+  layer_dense(units = 32) %>%
+  layer_batch_normalization() %>%
+  layer_activation("sigmoid") %>%
+    
+  layer_dense(units = 1, activation = "sigmoid")
+  
+  model %>% compile(
+    loss = "mse",
+    optimizer = optimizer_adam(learning_rate=1e-4),
+  )
+  
+  return(model)
+}
+
+# Costruisce il modello
+model <- build_model()
+# Riepilogo del modello
+summary(model)
+
+# Create learning rate decay callback
+lr_decay <- callback_reduce_lr_on_plateau(
+  monitor = "val_loss",
+  factor = 0.1,  # Factor by which the learning rate will be reduced. new_lr = lr * factor
+  patience = 5,  # Number of epochs with no improvement after which learning rate will be reduced
+  verbose = 1,  # Prints a message if learning rate is reduced
+  min_delta = 1e-4  # Minimum change in the monitored quantity to qualify as an improvement
+)
+
+early_stop <- callback_early_stopping(
+  monitor = "val_loss",
+  patience = 10,
+  restore_best_weights = TRUE,
+  verbose = 1
+)
+
+history <- model %>% fit(
+  x = train_data_nn,
+  y = train_labels,
+  epochs = 200,
+  batch_size = 16,
+  validation_split = 0.2,
+  verbose = 1,
+  callbacks = list(lr_decay, early_stop),
+)
+
+library(ggplot2)
+
+training_loss <- history$metrics$loss
+validation_loss <- history$metrics$val_loss
+epochs <- seq_along(training_loss)
+
+# Specify the epoch from which you want to start plotting
+start_epoch <- 0
+
+# Create a data frame for ggplot
+plot_data <- data.frame(
+  epoch = epochs[start_epoch:length(epochs)],
+  training_loss = training_loss[start_epoch:length(epochs)],
+  validation_loss = validation_loss[start_epoch:length(epochs)]
+)
+
+# Plot the data
+ggplot(plot_data, aes(x = epoch)) +
+  geom_line(aes(y = training_loss, color = "Training")) +
+  geom_line(aes(y = validation_loss, color = "Validation")) +
+  geom_point(aes(y = training_loss, color = "Training")) +
+  geom_point(aes(y = validation_loss, color = "Validation")) +
+  scale_y_log10() +
+  labs(x = "Epoch", y = "Mean Squared Error (log scale)", color = "Loss Type") +
+  theme_minimal()
+
+min_val_loss <- min(history$metrics$val_loss)
+min_val_loss_epoch <- which.min(history$metrics$val_loss)
+
+cat("Best Validation Loss:", min_val_loss, "at Epoch:", min_val_loss_epoch, "\n")
+
 ```
 
 ```{r compare models}
@@ -664,11 +785,12 @@ summary(gam_model)
 
 # K fold CV
 
-numfolds = 10
+numfolds = 5
 cv = createFolds(df$SalePrice, k=numfolds, list=TRUE)
 
 mse_linear = vector(mode="numeric", length=numfolds)
 mse_gam = vector(mode="numeric", length=numfolds)
+mse_nn = vector(mode="numeric", length=numfolds)
 
 for (fold in 1:numfolds){
   
@@ -691,18 +813,80 @@ for (fold in 1:numfolds){
     s(ScreenPorch) + s(MasVnrArea) + s(X1stFlrSF) + s(X2ndFlrSF) + BsmtQual + CentralAir,
     data=train)
   
+  
+  # nn preprocessing
+  nn_variables <- c(
+    "LotArea", "LandSlope", "Condition1", "BldgType",
+    "OverallQual", "YearBuilt", "YearRemodAdd", "RoofStyle", "BsmtExposure",
+    "BsmtFinSF1", "BsmtFinSF2", "TotalBsmtSF", "HeatingQC", "LowQualFinSF", "TotRmsAbvGrd",
+    "GrLivArea", "BedroomAbvGr", "KitchenQual", "Functional", "Fireplaces", "GarageArea",
+    "ScreenPorch", "MasVnrArea", "X1stFlrSF", "X2ndFlrSF", "BsmtQual", "CentralAir"
+  )
+  
+  # Extract the relevant columns from the dataframe
+  selected_columns <- c(nn_variables, "SalePrice")
+  
+  # train
+  selected_train <- train[, selected_columns, drop = FALSE]
+  #selected_train <- train
+  
+  numeric_columns <- sapply(selected_train, is.numeric)
+  numeric_data <- selected_train[, numeric_columns, drop = FALSE]
+  numeric_data <- numeric_data[, !colnames(numeric_data) %in% "SalePrice", drop = FALSE]
+  
+  min_num_train <- min(numeric_data)
+  max_num_train <- max(numeric_data)
+  numeric_data <- (as.matrix(numeric_data) - min_num_train) / (max_num_train - min_num_train)
+  
+  categorical_data <- selected_train[, !numeric_columns, drop = FALSE]
+  one_hot_encoded <- lapply(categorical_data, function(col) model.matrix(~ col - 1, data = data.frame(col)))
+  train_data_nn <- as.matrix(cbind(numeric_data, do.call(cbind, one_hot_encoded)))
+  
+  min_lab_train <- min(train$SalePrice)
+  max_lab_train <- max(train$SalePrice)
+  train_labels <- (as.matrix(train$SalePrice) - min_lab_train) / (max_lab_train - min_lab_train)
+  
+  # val
+  selected_test <- test[, selected_columns, drop = FALSE]
+  # selected_test <- test
+  
+  numeric_columns <- sapply(selected_test, is.numeric)
+  numeric_data <- selected_test[, numeric_columns, drop = FALSE]
+  numeric_data <- numeric_data[, !colnames(numeric_data) %in% "SalePrice", drop = FALSE]
+  numeric_data <- (as.matrix(numeric_data) - min_num_train) / (max_num_train - min_num_train)
+  categorical_data <- selected_test[, !numeric_columns, drop = FALSE]
+  one_hot_encoded <- lapply(categorical_data, function(col) model.matrix(~ col - 1, data = data.frame(col)))
+  test_data_nn <- as.matrix(cbind(numeric_data, do.call(cbind, one_hot_encoded)))
+  test_labels <- (as.matrix(test$SalePrice) - min_lab_train) / (max_lab_train - min_lab_train)
+
+  nn_model <- build_model()
+  history <- nn_model %>% fit(
+    x = train_data_nn,
+    y = train_labels,
+    epochs = 200,
+    batch_size = 16,
+    validation_data = list(x=test_data_nn, y=test_labels),
+    verbose = 1,
+    callbacks = list(lr_decay, early_stop),
+  )
+  
+  nn_predictions = nn_model %>% predict(test_data_nn) * (max_lab_train - min_lab_train) + min_lab_train
   lm_predictions = predict(linear_model, newdata=test)
   gam_predictions = predict(gam_model, newdata=test)
   
   linear_rmse <- sqrt(mean((test$SalePrice - lm_predictions)^2))
   gam_rmse <- sqrt(mean((test$SalePrice - gam_predictions)^2))
-  
+  nn_rmse <- sqrt(mean((test$SalePrice - nn_predictions)^2))
+
   mse_linear[fold] = linear_rmse
   mse_gam[fold] = gam_rmse  
+  mse_nn[fold] = nn_rmse
 }
 
-res = data.frame("rmse" = c(mse_linear, mse_gam),
-                 "model" = c(rep("Linear", numfolds), rep("Gam", numfolds)))
+res = data.frame("rmse" = c(mse_linear, mse_gam, mse_nn),
+                 "model" = c(rep("Linear", numfolds),
+                             rep("Gam", numfolds),
+                             rep("NN", numfolds)))
 
 res %>% ggplot(aes(y=rmse, x=model, fill=model)) + geom_boxplot()
 ```
