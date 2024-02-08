@@ -29,7 +29,7 @@ library(randomForest)
 
 
 ```{r pre processing} 
-df = read.csv("/Users/edoardozappia/Desktop/statistical project/train.csv")
+df = read.csv("house-prices-advanced-regression-techniques/train.csv")
               #house-prices-advanced-regression-techniques/train.csv")
 summary(df)
 #View(df)

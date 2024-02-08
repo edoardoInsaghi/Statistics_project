@@ -249,7 +249,7 @@ m = ggcorrplot(mat) + labs(title="Mutual Information Matrix")
 m
 ```
 
-```{r first sketches for linear models, echo=FALSE}
+```{r Linear models, echo=FALSE}
 
 
 num_vars = df %>% select_if(is.numeric)
