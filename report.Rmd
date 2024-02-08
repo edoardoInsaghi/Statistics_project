@@ -55,16 +55,13 @@ set.seed(42)
 tensorflow::set_random_seed(42)
 ```
 
+The first step is to explore the data. As mentioned in the introduction, the dataset consists of 1460 observations and 79 covariates, which is a substantial number of variables, and poses the challenge of selecting which ones play a role in determining the response variable, and which do not.
+
+The preprocessing of the data consisted in a number of steps: we first decided to remove from the dataset all the variables with an excessive number of NAs and fill those which had a reasonable amount of NAs (<100) with the mean or the mode of the remaining observations, depending on whether such variables were numerical or categorical. We then proceeded to scale the extremely right skewed numerical variables using a logarithmic transformation, which helps normalizing the variables and making them more easily explainable. Lastly, given the substantial number of categorical variables with dozens, if not hundreds, of categories, we decided to dump the least occurring variables into a separate category. This procedure helps keeping the degrees of freedom under control and makes the models more easily explainable.
+
 ```{r pre processing, echo=FALSE}
 
 df = read.csv("house-prices-advanced-regression-techniques/train.csv")
-
-#summary(df)
-#View(df)
-
-# NA
-nas = colSums(is.na(df))
-#nas
 
 # numerical var pre processing, some are commented out because log transforming does not
 # really help with zero inflation
@@ -78,8 +75,8 @@ df$X3SsnPorch = log(df$X3SsnPorch + 1)
 
 # categorical variables, we have many variables with hundreds of unique values
 # i am grouping together less frequent values; if there are few NA i am grouping
-# them together with the new group, which will always be "other". i am excluding
-# overly imbalanced variables (also debatable)
+# them together with the new group, which will always be "other". Also excluding
+# overly imbalanced variables 
 df = df %>%
   mutate(MSZoning = fct_lump(MSZoning, n = 2, other_level = "other"),
          LotShape = fct_lump(LotShape, n = 2, other_level = "other"),
@@ -94,7 +91,7 @@ df = df %>%
          Exterior1st = fct_lump(Exterior1st, n = 4, other_level = "other"),
          Exterior2nd = fct_lump(Exterior2nd, n = 4, other_level = "other"),
          MasVnrType = fct_lump(MasVnrType, n = 4, other_level = "other"),
-         MasVnrType = fct_explicit_na(MasVnrType, na_level = "other"), # otherwise NA do weird stuff
+         MasVnrType = fct_explicit_na(MasVnrType, na_level = "other"),
          ExterQual = fct_lump(ExterQual, n = 4, other_level = "other"),
          ExterCond = fct_lump(ExterCond, n = 2, other_level = "other"),
          Foundation = fct_lump(Foundation, n = 2, other_level = "other"),
@@ -111,7 +108,7 @@ df = df %>%
          FireplaceQu = fct_lump(FireplaceQu, n = 3, other_level = "other"),
          GarageType = fct_lump(GarageType, n = 2, other_level = "other"),
          GarageFinish = fct_lump(GarageFinish, n = 3, other_level = "other"),
-         GarageFinish = fct_explicit_na(GarageFinish, na_level = "other"), # otherwise NA do weird stuff
+         GarageFinish = fct_explicit_na(GarageFinish, na_level = "other"),
          PavedDrive = fct_lump(PavedDrive, n = 2, other_level = "other"),
          Electrical = fct_lump(Electrical, n = 2, other_level = "other"),
          SaleType = fct_lump(SaleType, n = 3, other_level = "other"),
@@ -124,55 +121,56 @@ df[] = lapply(df, function(x) {
   }
   return(x)
 })
+
 conflict_prefer("select", "dplyr")
 conflict_prefer("filter", "dplyr")
+
 # Removing very imbalanced covariates and also some values full of NA 
 exclude = c("Id", "Street", "Utilities", "Condition2", "RoofMatl", 
             "Heating", "GarageQual", "GarageCond")
 excludeNA = c("GarageYrBlt", "Alley", "Fence", "PoolQC", "MiscFeature")
 df = df %>% select(-one_of(c(exclude, excludeNA))) %>% filter(TotalBsmtSF <= 6000,
-                                                              LotFrontage <= 300) #annoying outlier
+                                                              LotFrontage <= 300) # annoying outlier
 
-# check everything works
-#summary(df)
-nas = colSums(is.na(df))
-#nas
-total_na = sum(is.na(df)) # no more NAs
 ```
+
+We also considered taking the logarithm of the response variable, which also appears to be right skewed, but this does not improve significantly the explanatory power of the models, and we therefore decided to leave it as it is preserving the interpretability of the models abiding by the principle expressed by the Occam's Razor. 
+
+We observed the correlation matrix to explore how the numerical variables are related to each other and have a first look at how they are correlated to the response variable. We then show a few scatterplots of the response variables against some interesting covariate, looking for any sort of relationship with the house price.
 
 ```{r numerical variables, echo=FALSE}
 
 # distribution of response variable
 h = ggplot(data=df, aes(x=SalePrice)) +
-  geom_histogram(fill="indianred", bins=30, color="black", aes(y = ..count..)) +
+  geom_histogram(fill="steelblue", bins=30, color="black", aes(y = after_stat(density))) +
   scale_fill_identity() + theme_bw()
 h
 
 
 numdf = df %>% select_if(is.numeric)
 
+p1 = ggplot(data=numdf, aes(x=LotArea, y=SalePrice)) + geom_point() + 
+  geom_smooth(method="loess") + theme_bw()
+p1
+
+p2 = ggplot(data=numdf, aes(x=OverallQual, y=SalePrice)) + geom_point() + 
+  geom_smooth(method="loess") + theme_bw()
+p2
+
+p3 = ggplot(data=numdf, aes(x=GrLivArea, y=SalePrice)) + geom_point() + 
+  geom_smooth(method="lm") + theme_bw()
+p3
+
 # correlation matrix
 c = ggcorrplot(cor(numdf)) + labs(title="Correlation Matrix")
 c
-
-# messy, many of these variables are probably still categorical
-# also this plot is ugly, we won't show it
-p = numdf %>% pivot_longer(names_to="variable", values_to="value", cols=everything()) %>% 
-  ggplot(aes(x=value)) + geom_histogram(fill="indianred", bins=30, color="black", aes(y = ..count..)) + 
-  theme_bw() + facet_wrap(~variable, scales="free") +
-  labs(title="Histogram of the numerical variables")
-p
-
-vars = colnames(numdf)
-
-plots = lapply(vars, function(i){
-  
-  p = ggplot(data=numdf, aes_string(x=i, y="SalePrice")) + geom_point() + 
-    geom_smooth(method="loess") + theme_bw()
-  
-  plot(p)
-})
 ```
+
+When the number of covariates is high, it may be beneficial to put in place techniques that aim at reducing the dimensionality of the dataset, while preserving as much information as possible. We decided to use the principal component analysis, a linear dimensionality reduction tool that works by projecting the data onto the eigenvectors of the covariance matrix of the data, to see whether the dataset can be summarized with less variables. 
+
+The elbowplot in the figure represents the proportion of the variance explained by each principal component. The results are not extremely exciting, because ideally we would like to see the first few principal components explaining the majority of the variance in our data, which is not what is happening here. 
+
+We then plotted the first four principal components against each other, highlighting the value of the Sale Price in the plots, looking for interesting patters. Apparently, only the first principal component seems to explain something about the response variable. The last plot includes the loadings of the variables on the first few principal components, here we are particularly interested in which variables contribute noticeably to the first component. These variables have to be observed closely since they are likely to influence the price of the house.
 
 ```{r dimensionality reduction, echo=FALSE}
 
@@ -180,21 +178,17 @@ ndim = 4 # the dimension of the space onto which the data is projected
 # both pca and UMAP, could be different between them
 
 # these transformation are here only to make the gradient in the plots more visible
-scaledSalePrice = (numdf$SalePrice - mean(numdf$SalePrice)) / sd(numdf$SalePrice) # i think this is useless
 scaledSalePrice = log(numdf$SalePrice)
-#scaledSalePrice = numdf$SalePrice
-#low = quantile(numdf$SalePrice, 0.1)
-#high = quantile(numdf$SalePrice, 0.9)
 
 # naive attempt with pca
-# I think we need to exclude the variable we wish to predict here, debatable tbf
 pca = prcomp(numdf %>% select(-SalePrice), scale.=TRUE)
 
-# elbowplot
+# elbow plot
 r2 = pca$sdev^2 / sum(pca$sdev^2)
 elbow_plot = data.frame("PC"=seq_along(r2), "ExplainedVar"=r2) %>% 
   ggplot(aes(x=PC, y=ExplainedVar)) + geom_line() + geom_point() + 
   labs(title="% of the variance explained by the PCs") + theme_bw()
+
 # not ideal, we would like to see the first components to
 #account for a bigger proportion of the variance
 elbow_plot
@@ -222,6 +216,7 @@ disp
 # components, and their correlations, since similar variables tend to contribute
 # to the same directions. I still need to find a way to put a number
 # in the legend and x axis to identify the variables
+
 loadings = as.data.frame(pca$rotation[,1:ndim])
 names_nums = sort(rownames(loadings))
 loadings = loadings[names_nums,]
@@ -242,22 +237,27 @@ z = ggplot(loadings, aes(x=substr(var, nchar(var)-2, nchar(var)), y=loading, fil
 z
 ```
 
+We concluded the exploratory analysis of the data by taking a look at the categorical variables. We plotted the boxplot of the Sale Price conditioned to every class of the categorical variables, looking for significant differences among them. For clarity we just decided to show the plots for some interesting covariates.
+
+The last plot represents the mutual information matrix for the categorical covariates. It conveys information about the dependence between two variables, and we adopted it as a way of assessing correlation between these variables.
+
 ```{r categorical variables, echo=FALSE}
 
 catdf = df %>% select_if(~!is.numeric(.))
 vars = colnames(catdf)
 catdf$SalePrice = df$SalePrice
 
-plots = lapply(vars, function(i){
-  
-  p = ggplot(data=catdf, aes_string(x=i, y="SalePrice", fill=i)) + 
-    geom_boxplot() + scale_fill_viridis(option=color, discrete=TRUE) + theme_bw()
-  
-  plot(p)
-})
+p4 = ggplot(data=catdf, aes(x=BsmtQual, y=SalePrice, fill=BsmtQual)) + 
+  geom_boxplot() + scale_fill_viridis(option=color, discrete=TRUE) + theme_bw()
+p4
 
-# Could not fit them all in a single plot, i think we could show only the most interesting ones
+p5 = ggplot(data=catdf, aes(x=KitchenQual, y=SalePrice, fill=KitchenQual)) + 
+  geom_boxplot() + scale_fill_viridis(option=color, discrete=TRUE) + theme_bw()
+p5
 
+p6 = ggplot(data=catdf, aes(x=GarageFinish, y=SalePrice, fill=GarageFinish)) + 
+  geom_boxplot() + scale_fill_viridis(option=color, discrete=TRUE) + theme_bw()
+p6
 
 # Mutual information matrix, allows to find correlations between categorical variables
 mat = mutinformation(catdf %>% select(!SalePrice))
