@@ -1,5 +1,14 @@
 ---
-title: "dataExp"
+title: |
+  | Statistical Methods - Final Project:
+  | House Prices - Regressing Sales Price
+author:
+  - Donninelli Adriano
+  - Insaghi Edoardo
+  - Zappi Piero
+  - Zappia Edoardo
+bibliography: references.bib
+csl: biomed-central.csl # whatever numeric .csl
 output: pdf_document
 ---
 
@@ -7,7 +16,16 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r libraries, echo=FALSE}
+# Introduction
+
+This project aims to develop statistical models capable of predicting house sale prices from a set of covariates describing every aspect of the property.
+To do it we leverage the "House Prices - Advanced Regression Techniques" dataset from Kaggle @kaggledata. This dataset comprises 1460 samples of property sales situated in Ames, Iowa. For each one, 79 explanatory variables are collected, varying from the year of construction to the type of foundations used.
+
+TODO: Write something about target variable (to say that is a regression task)?? or we can write it later when doing data expl.
+
+We begin by exploring the data and doing the necessary preprocessing steps. After that, we simplify the data using a dimensionality reduction technique (PCA) to gain insights into how the target variable relates to other factors. Next, we suggest up to four statistical models: LM, GAM, RF, and a basic NN. We fine-tune each model to make them work better and then compare the results using cross-validation since there is no predefined validation dataset.
+
+```{r libraries, echo=FALSE, results=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 library(dplyr)
 library(tidyverse)
 library(forcats)
@@ -34,9 +52,8 @@ library(tensorflow)
 library(car)
 
 set.seed(42)
-tensorflow::set_random_seed
+tensorflow::set_random_seed(42)
 ```
-
 
 ```{r pre processing, echo=FALSE}
 
@@ -224,7 +241,6 @@ z = ggplot(loadings, aes(x=substr(var, nchar(var)-2, nchar(var)), y=loading, fil
   theme_bw()
 z
 ```
-
 
 ```{r categorical variables, echo=FALSE}
 
@@ -511,7 +527,7 @@ coef(best_model)
 
 ```{r RANDOM FOREST, echo=FALSE}
 # RANDOM FOREST
-rf_model <- randomForest(SalePrice ~ ., data = df, ntree = 1000, importance = TRUE)
+rf_model <- randomForest(SalePrice ~ ., data = df, ntree = 500, importance = TRUE)
 print(rf_model)
 ```
 
@@ -584,7 +600,18 @@ spline_model = gam(formula = SalePrice ~ LotArea + LandSlope + Condition1 + Bldg
 summary(spline_model)
 ```
 
-```{r nn model, echo=FALSE}
+## Neural Network Model
+
+Our final model is a Neural Network, known for its flexibility and ability to capture powerful non-linear relationships between inputs and outputs, though at the cost of explainability.
+
+The network is structured in layers, with the input layer receiving the input, and subsequent layers processing the output of the previous one. Coefficients are learned through stochastic gradient descent, and each layer applies a scalar non-linear function before passing the output to the next layer.
+
+Our specific model is a small-sized multilayer perceptron (MLP) with three fully connected layers. After some architecture tuning, we set the first and second layers to have 32 neurons each, while the last layer, predicting the scalar output variable, consists of a single neuron. In order to stabilize training we normalize all numerical features to lie in the $[0, 1]$ range. The categorical variables on the other hand are one-hot encoded before feeding to the network. All layers use the sigmoid (inverse logit) non linear activation function.
+
+Instead of feeding all features in the dataset to the NN, we find that using the same variables picked for the GAM model leads to consistently better results.
+
+Here's the summary of the model:
+```{r nn model, echo=FALSE, warning=FALSE}
 nn_variables <- c(
   "LotArea", "LandSlope", "Condition1", "BldgType",
   "OverallQual", "YearBuilt", "YearRemodAdd", "RoofStyle", "BsmtExposure",
@@ -593,28 +620,18 @@ nn_variables <- c(
   "ScreenPorch", "MasVnrArea", "X1stFlrSF", "X2ndFlrSF", "BsmtQual", "CentralAir"
 )
 
-
-# Extract the relevant columns from the dataframe
+# Preprocessing to obtain size of input.
 selected_columns <- c(nn_variables, "SalePrice")
-selected_data <- df[, selected_columns, drop = FALSE]
-# selected_data <- df
-
-# If you uncomment scaling you can remove this
-# Extracting numerical and categorical columns
-numeric_columns <- sapply(selected_data, is.numeric)
-numeric_data <- selected_data[, numeric_columns, drop = FALSE]
-categorical_data <- selected_data[, !numeric_columns, drop = FALSE]
-
+selected_train <- df[, selected_columns, drop = FALSE]
+numeric_columns <- sapply(selected_train, is.numeric)
+numeric_data <- selected_train[, numeric_columns, drop = FALSE]
 numeric_data <- numeric_data[, !colnames(numeric_data) %in% "SalePrice", drop = FALSE]
-numeric_data <- (as.matrix(numeric_data) - min(numeric_data)) / (max(numeric_data) - min(numeric_data))
-
-# Convert categorical variables to onehot encoding
+min_num_train <- min(numeric_data)
+max_num_train <- max(numeric_data)
+numeric_data <- (as.matrix(numeric_data) - min_num_train) / (max_num_train - min_num_train)
+categorical_data <- selected_train[, !numeric_columns, drop = FALSE]
 one_hot_encoded <- lapply(categorical_data, function(col) model.matrix(~ col - 1, data = data.frame(col)))
-
-# Combine numerical and categorical data
 train_data_nn <- as.matrix(cbind(numeric_data, do.call(cbind, one_hot_encoded)))
-train_labels <- (as.matrix(selected_data$SalePrice) - min(selected_data$SalePrice)) / (max(selected_data$SalePrice) - min(selected_data$SalePrice))
-
 
 build_model <- function() {
   
@@ -637,9 +654,7 @@ build_model <- function() {
   return(model)
 }
 
-# Costruisce il modello
 model <- build_model()
-# Riepilogo del modello
 summary(model)
 
 # Create learning rate decay callback
@@ -657,65 +672,18 @@ early_stop <- callback_early_stopping(
   restore_best_weights = TRUE,
   verbose = 0
 )
-
-#history <- model %>% fit(
-#  x = train_data_nn,
-#  y = train_labels,
-#  epochs = 200,
-#  batch_size = 16,
-#  validation_split = 0.2,
-#  verbose = 0,
-#  callbacks = list(lr_decay, early_stop),
-#)
-
-# training_loss <- history$metrics$loss
-# validation_loss <- history$metrics$val_loss
-# epochs <- seq_along(training_loss)
-
-# Specify the epoch from which you want to start plotting
-# start_epoch <- 0
-
-# Create a data frame for ggplot
-# plot_data <- data.frame(
-#   epoch = epochs[start_epoch:length(epochs)],
-#   training_loss = training_loss[start_epoch:length(epochs)],
-#   validation_loss = validation_loss[start_epoch:length(epochs)]
-# )
-# 
-# # Plot the data
-# ggplot(plot_data, aes(x = epoch)) +
-#   geom_line(aes(y = training_loss, color = "Training")) +
-#   geom_line(aes(y = validation_loss, color = "Validation")) +
-#   geom_point(aes(y = training_loss, color = "Training")) +
-#   geom_point(aes(y = validation_loss, color = "Validation")) +
-#   scale_y_log10() +
-#   labs(x = "Epoch", y = "Mean Squared Error (log scale)", color = "Loss Type") +
-#   theme_minimal()
-# 
-# min_val_loss <- min(history$metrics$val_loss)
-# min_val_loss_epoch <- which.min(history$metrics$val_loss)
-
-# cat("Best Validation Loss:", min_val_loss, "at Epoch:", min_val_loss_epoch, "\n")
-
 ```
+The batch normalization layers that appear in the summary are commonly used to stabilize and speed up training @ioffe2015batch. They perform sample wise centering and scaling of the input of each layer.
+
+We can see from the summary that the model has a total of 2817 trainable parameters. As stated before the training is performed using SGD, in particular we use the Adam optimizer which is a stochastic gradient descent method that is based on adaptive estimation of first-order and second-order moments. As in other gradient descent methods we have to pick a learning rate, in our case we fix it to $1e-4$ and decrease it during training if the validation loss does not improve for a certain amount of epochs. As a loss function we use the Mean Squared Error (MSE).
+
+# ```{r}
+# knitr::knit_exit()
+# ```
 
 ```{r compare models, echo=FALSE}
-
-linear_model = lm(SalePrice ~ LotArea + LandSlope + Condition1 + BldgType + OverallQual + 
-    RoofStyle + BsmtExposure + BsmtFinSF1 + BsmtFinSF2 + TotalBsmtSF + HeatingQC + LowQualFinSF +
-    GrLivArea + BsmtFullBath + BedroomAbvGr + KitchenAbvGr + KitchenQual + Functional + Fireplaces +  
-    GarageArea + WoodDeckSF + ScreenPorch + PoolArea + YearBuilt + YearRemodAdd,
-    data=df)
-
-gam_model = gam(formula = SalePrice ~ LotArea + LandSlope + Condition1 + BldgType + 
-    s(OverallQual) + s(YearBuilt) + s(YearRemodAdd) + RoofStyle + BsmtExposure + 
-    s(BsmtFinSF1) + BsmtFinSF2 + TotalBsmtSF + HeatingQC + LowQualFinSF + s(TotRmsAbvGrd) + 
-    GrLivArea + BedroomAbvGr +  KitchenQual + Functional + Fireplaces + s(GarageArea) + 
-    s(ScreenPorch) + s(MasVnrArea) + s(X1stFlrSF) + s(X2ndFlrSF) + BsmtQual + CentralAir,
-    data = df)
-
 # K fold CV
-numfolds = 1 # 5
+numfolds = 10
 cv = createFolds(df$SalePrice, k=numfolds, list=TRUE)
 
 mse_linear = vector(mode="numeric", length=numfolds)
@@ -729,6 +697,22 @@ for (fold in 1:numfolds){
   
   train = df[train_idx, ]
   test = df[test_idx, ]
+  
+  # Fit all models
+  linear_model = lm(SalePrice ~ LotArea + LandSlope + Condition1 + BldgType + OverallQual + 
+      RoofStyle + BsmtExposure + BsmtFinSF1 + BsmtFinSF2 + TotalBsmtSF + HeatingQC + LowQualFinSF +
+      GrLivArea + BsmtFullBath + BedroomAbvGr + KitchenAbvGr + KitchenQual + Functional + Fireplaces +  
+      GarageArea + WoodDeckSF + ScreenPorch + PoolArea + YearBuilt + YearRemodAdd,
+      data=train)
+  
+  gam_model = gam(formula = SalePrice ~ LotArea + LandSlope + Condition1 + BldgType + 
+      s(OverallQual) + s(YearBuilt) + s(YearRemodAdd) + RoofStyle + BsmtExposure + 
+      s(BsmtFinSF1) + BsmtFinSF2 + TotalBsmtSF + HeatingQC + LowQualFinSF + s(TotRmsAbvGrd) + 
+      GrLivArea + BedroomAbvGr +  KitchenQual + Functional + Fireplaces + s(GarageArea) + 
+      s(ScreenPorch) + s(MasVnrArea) + s(X1stFlrSF) + s(X2ndFlrSF) + BsmtQual + CentralAir,
+      data = train)
+  
+  rf_model <- randomForest(SalePrice ~ ., data = train, ntree = 1000, importance = FALSE)
     
   # nn preprocessing
   nn_variables <- c(
@@ -744,8 +728,7 @@ for (fold in 1:numfolds){
   
   # train
   selected_train <- train[, selected_columns, drop = FALSE]
-  #selected_train <- train
-  
+
   numeric_columns <- sapply(selected_train, is.numeric)
   numeric_data <- selected_train[, numeric_columns, drop = FALSE]
   numeric_data <- numeric_data[, !colnames(numeric_data) %in% "SalePrice", drop = FALSE]
@@ -761,10 +744,9 @@ for (fold in 1:numfolds){
   min_lab_train <- min(train$SalePrice)
   max_lab_train <- max(train$SalePrice)
   train_labels <- (as.matrix(train$SalePrice) - min_lab_train) / (max_lab_train - min_lab_train)
-  
+
   # val
   selected_test <- test[, selected_columns, drop = FALSE]
-  # selected_test <- test
   
   numeric_columns <- sapply(selected_test, is.numeric)
   numeric_data <- selected_test[, numeric_columns, drop = FALSE]
@@ -774,7 +756,7 @@ for (fold in 1:numfolds){
   one_hot_encoded <- lapply(categorical_data, function(col) model.matrix(~ col - 1, data = data.frame(col)))
   test_data_nn <- as.matrix(cbind(numeric_data, do.call(cbind, one_hot_encoded)))
   test_labels <- (as.matrix(test$SalePrice) - min_lab_train) / (max_lab_train - min_lab_train)
-
+  
   nn_model <- build_model()
   history <- nn_model %>% fit(
     x = train_data_nn,
@@ -789,7 +771,7 @@ for (fold in 1:numfolds){
   nn_predictions = nn_model %>% predict(test_data_nn) * (max_lab_train - min_lab_train) + min_lab_train
   lm_predictions = predict(linear_model, newdata=test)
   gam_predictions = predict(gam_model, newdata=test)
-  rf_predictions = predict(rf_model, test)
+  rf_predictions = predict(rf_model, newdata=test)
 
   linear_rmse <- sqrt(mean((test$SalePrice - lm_predictions)^2))
   gam_rmse <- sqrt(mean((test$SalePrice - gam_predictions)^2))
@@ -797,7 +779,7 @@ for (fold in 1:numfolds){
   rf_rmse <- sqrt(mean((test$SalePrice - rf_predictions)^2))
 
   mse_linear[fold] = linear_rmse
-  mse_gam[fold] = gam_rmse  
+  mse_gam[fold] = gam_rmse
   mse_nn[fold] = nn_rmse
   mse_rf[fold] = rf_rmse
 }
