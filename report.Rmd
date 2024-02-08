@@ -1,5 +1,14 @@
 ---
-title: "dataExp"
+title: |
+  | Statistical Methods - Final Project:
+  | House Prices - Regressing Sales Price
+author:
+  - Donninelli Adriano
+  - Insaghi Edoardo
+  - Zappi Piero
+  - Zappia Edoardo
+bibliography: references.bib
+csl: biomed-central.csl # whatever numeric .csl
 output: pdf_document
 ---
 
@@ -249,13 +258,18 @@ m = ggcorrplot(mat) + labs(title="Mutual Information Matrix")
 m
 ```
 
+## Linear model
+
+In this paragraph we discuss the building process of the linear model we employed to predict the response variable `SalePrice`.
+
+The goal was to obtain a model showcasing a good trade-off between its performance and its complexity. In fact, since the dataset we had at disposal consisted of many different variables, the first task was to select among them the covariates to use for our model, choosing the ones which would lead to better performances in terms of *adjusted $R^2$* and, at the same time
+
+
+
 ```{r Linear models, echo=FALSE}
 
 
 num_vars = df %>% select_if(is.numeric)
-
-# corr_matrix = cor(num_vars)
-# corrplot(corr_matrix, method = "color")
 
 #let's now use only numerical variables
 
@@ -508,6 +522,8 @@ coef(best_model)
 
 
 ```
+
+## Random Forest
 
 ```{r RANDOM FOREST, echo=FALSE}
 # RANDOM FOREST
