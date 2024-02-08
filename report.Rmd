@@ -226,7 +226,7 @@ z
 ```
 
 
-```{r categorical variables}
+```{r categorical variables, echo=FALSE}
 
 catdf = df %>% select_if(~!is.numeric(.))
 vars = colnames(catdf)
@@ -513,13 +513,29 @@ coef(best_model)
 # RANDOM FOREST
 rf_model <- randomForest(SalePrice ~ ., data = df, ntree = 1000, importance = TRUE)
 print(rf_model)
-# importance(rf_model)
-# The Mean of squared residuals is the MSE of the out-of-bag errors.
-# Mean of squared residuals: 772402205. Its root is 27792.12, it's a good result considering the scale of houses prices.
-# The % Var explained term is a “pseudo R-squared”, computed as 1 - MSE/Var(y). 
-# % Var explained: 87.76. We can compare this result with the Adjusted R-squared obtained with the linear model.
-
 ```
+
+The "mean of squared residuals" is the MSE of the out-of-bag errors.
+
+In Random Forest, out-of-bag (OOB) observations refer to the data points that are not included in the bootstrap sample used to grow a particular tree in the forest. Bootstrap sampling involves randomly selecting data points from the original dataset with replacement, which means some observations may be selected multiple times while others may not be selected at all.
+
+Since each tree in a Random Forest is grown using a bootstrap sample, there will be some data points that were not included in the sample used to build that specific tree. These out-of-bag observations are essentially left out during the training process of that tree.
+
+After growing each tree in the forest, the out-of-bag observations can be used to evaluate the performance of that tree by calculating prediction errors. This process is repeated for each tree, and the aggregate prediction errors across all trees are used to assess the overall performance of the Random Forest model.
+
+The mean of squared residuals obtained is a good result considering the scale of houses prices.
+
+If we compute the root of the mean of MSE of single trees we obtain `r sqrt(mean(rf_model$mse))` that is a reasonable value, also considering other models.
+ 
+ 
+The "% Var explained" term is a “pseudo R-squared”, computed as `1 - MSE/Var(y)`.
+This value represents the proportion of the total variance in the response variable that is accounted for by the predictor variables included in the Random Forest model.
+
+The "% Var explained" term is a useful metric for assessing the goodness-of-fit of the Random Forest model. A higher percentage indicates that a larger proportion of the variability in the response variable is captured by the predictors included in the model, suggesting a better fit.
+
+Our result suggests that Random Forest model can explain pretty well the total variance of the response variable.
+
+We can compare this result with the Adjusted R-squared obtained with the linear model.
 
 ```{r, IMPORTANCE GRAPH, echo=FALSE}
 ImpData <- as.data.frame(importance(rf_model))
@@ -539,13 +555,24 @@ ggplot(ImpData, aes(x = Var.Names, y = `%IncMSE`)) +
     axis.ticks.y = element_blank(),
     axis.text = element_text(size = 5)
   )
-
-# This graph represents %IncMSE and IncNodePurity, usefull to visualize variables' importance
-# %IncMSE is the most robust and informative measure. It is the increase in mse of predictions(estimated with out-of-bag-CV) as a result of variable j being permuted(values randomly shuffled). The higher, the more important.
-# IncNodePurity relates to the loss function which by best splits are chosen. The loss function is mse for regression and gini-impurity for classification. More useful variables achieve higher increases in node purities, that is to find a split which has a high inter node 'variance' and a small intra node 'variance'. IncNodePurity is biased and should only be used if the extra computation time of calculating %IncMSE is unacceptable. Since it only takes ~5-25% extra time to calculate %IncMSE, this would almost never happen.
-
-
 ```
+
+This graph represents %IncMSE and IncNodePurity, usefull to visualize variables' importance.
+
+"%IncMSE" is the most robust and informative measure. It is the increase in MSE of predictions (estimated with out-of-bag-CV) as a result of variable j being permuted (values randomly shuffled). The higher, the more important.
+ 
+"IncNodePurity" relates to the loss function which by best splits are chosen. The loss function is MSE for regression and GINI-impurity for classification.
+More useful variables achieve higher increases in node purities, that is to find a split which has a high inter node 'variance' and a small intra node 'variance'.
+
+Inter-node variance refers to the variance between different nodes or branches of a decision tree or ensemble.
+In a Random Forest, inter-node variance specifically measures the variability in predictions across different trees in the forest.
+
+Intra-node variance refers to the variance within a specific node or branch of a decision tree or ensemble. It quantifies the variability in predictions or target variable values within a particular subset of data represented by a node.
+
+In summary, while inter-node variance focuses on the variability between different nodes or trees in an ensemble, intra-node variance focuses on the variability within individual nodes or trees.
+
+As we can see by the graph, a lot of variables selected with the analysis using linear models are the most important ones also for the Random Forest model.
+
 ```{r gam model, echo=FALSE}
 spline_model = gam(formula = SalePrice ~ LotArea + LandSlope + Condition1 + BldgType + 
     s(OverallQual) + s(YearBuilt) + s(YearRemodAdd) + RoofStyle + BsmtExposure + 
