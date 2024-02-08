@@ -23,7 +23,7 @@ To do it we leverage the "House Prices - Advanced Regression Techniques" dataset
 
 TODO: Write something about target variable (to say that is a regression task)?? or we can write it later when doing data expl.
 
-We begin by exploring the data and doing the necessary preprocessing steps. After that, we simplify the data using a dimensionality reduction technique (PCA) to gain insights into how the target variable relates to other factors. Next, we suggest up to four statistical models: LM, GAM, RF, and a basic NN. We fine-tune each model to make them work better and then compare the results using cross-validation since there is no predefined validation dataset.
+We begin by exploring the data and doing the necessary preprocessing steps. After that, we simplify the data using a dimensionality reduction technique (PCA) to gain insights into how the target variable relates to other factors. Next, we suggest up to four statistical models: LM, GAM, RF, and a basic NN. We fine-tune each model to make them work better and then compare the results using cross-validation since there is no a predefined validation dataset at disposal.
 
 ```{r libraries, echo=FALSE, results=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 library(dplyr)
@@ -269,266 +269,108 @@ m
 
 In this paragraph we discuss the building process of the linear model we employed to predict the response variable `SalePrice`.
 
-The goal was to obtain a model showcasing a good trade-off between its performance and its complexity. In fact, since the dataset we had at disposal consisted of many different variables, the first task was to select among them the covariates to use for our model, choosing the ones which would lead to better performances in terms of *adjusted $R^2$* and, at the same time
+The goal was to obtain a model showcasing a good trade-off between its performance and its complexity. In fact, since the dataset we had at disposal consisted of many different variables, the first task was to select among them the covariates to use for our model, by choosing the ones which would lead to better performances in terms of explained variability of the response variable (higher *adjusted $R^2$*). Moreover, we wanted the vast majority of the terms to be statistically significant and therefore, at the same time, we selected the covariates trying to avoid multicollinearity problems. Finally, in order to address the model's complexity, interpretability and to avoid overfitting, we simplified as much as possible the model's structure, while maintaining consistent results in terms of *adjusted $R^2$*.
 
+In order to reduce from the beginning the risk of having multicollinearity problems, we first decided to remove from the dataset some variables which were highly correlated to/dependent from other variables; among a set of correlated variables, we kept in the dataset the one which was the most correlated to the response variable and therefore more useful to predict it. We then selected the covariates to remove by looking at the correlation matrix (for the numerical variables) and the mutual information matrix (for the categorical variables).
 
+Starting from a linear model containing all the remaining variables in the dataset as covariates (*adjusted $R^2=0.8683$*), we used the `stepAIC` function (part of the `MASS` package) to select the linear model composed by the best combination of covariates with respect to the *AIC* (Akaike Information Criterion).
+
+The AIC is a measure that balances the goodness of fit of a model with its complexity, penalizing the models that are too complex: better fits correspond to smaller AIC values; the goal was to find a model that fitted the data well while avoiding overfitting.
+
+The `stepAIC` function systematically adds or removes predictor variables from the model to find the combination that minimizes the AIC. The process involves iteratively fitting models, assessing their AIC, and deciding whether to add or remove variables based on the AIC improvement.
+
+The `stepAIC` function returned the model which minimized the AIC: this model consisted of $30$ covariates, so it was way less complex than the starting one; it showed good performance as well, since it had *adjusted $R^2=0.8696$*. We computed the *variance inflation factor* (VIF) associated to each predictor to spot eventual collinearity and we obtained $VIF_j<4$ $\forall j$ (way below the critical value $10$). Finally, the ANOVA suggested to keep this simpler model instead of the initial more complex one.
+
+Indeed, we obtained a list of $30$ selected variables to use as covariates of our linear model. In order to simplify the model we got using the `stepAIC` function, we then tried to fit a LASSO model using these variables, to see if we could remove some more predictors by shrinking their coefficients to zero. 
+In this way we were able to exclude four more variables from our list of covariates; we then again used the `stepAIC` function starting from a linear model containing the remaining selected variables as predictors and obtained the following final linear model.
 
 ```{r Linear models, echo=FALSE}
 
-
-num_vars = df %>% select_if(is.numeric)
-
-#let's now use only numerical variables
-
-first_lin_model = lm(SalePrice ~ OverallQual + GrLivArea, num_vars) #simple model with just 2 "highly correlated" covariates
-summary(first_lin_model)
-
-first_lin_model = lm(SalePrice ~ OverallQual + GrLivArea + FullBath, num_vars) #we can see the model does not improve; in fact, FullBath is highly correlated to GrLivArea
-summary(first_lin_model)
-
-complete_model = lm(SalePrice ~ ., num_vars) #model with all covariates
-
-final_model = stepAIC(complete_model, direction = "both", trace = F) #stepAIC for model selection starting from the model with all the covariates
-
-summary(final_model) #print final model's info
-plot(final_model)
-
-vif(final_model) #find covariates with VIF>10 to exclude them
-
-intercept_model = lm(SalePrice ~ 1, num_vars) #model with just the intercept
-
-
-#let's now consider the categorical variables as well
-
-#let's first select and use only the categorical covariates
-
-catdf = df %>% select_if(~!is.numeric(.))
-catdf$SalePrice = df$SalePrice
-
-first_cat_model = lm(SalePrice ~ BsmtQual, catdf) #simple model with just a covariate, which, by looking at the scatterplots, seems a nice one to start with
-summary(first_cat_model)
-
-complete_cat_model = lm(SalePrice ~ ., catdf) #model with all categorical covariates
-
-final_cat_model = stepAIC(complete_cat_model, direction = "both", trace = F) #stepAIC for model selection starting from 
-
-summary(final_cat_model) #print final model's info
-plot(final_cat_model)
-
-vif(final_cat_model) #find covariates with VIF>10 to exclude them
-#Seems reasonable to exclude Neighborhood
-
-#let's start more serious stuff
-#what if we use all the variables?
-complete_model_all = lm(SalePrice ~ ., df) #model with all covariates
-
-final_model_all = stepAIC(complete_model_all, direction = "both", trace = F) #stepAIC for model selection starting from the model with all the covariates
-
-summary(final_model_all) #print final model's info
-plot(final_model_all)
-
-# Now starting from this model given by the stepAIC function, let's try to improve it
-
-vif(final_model_all) #find covariates with VIF>10 to exclude them from the model
-
-# Extracting variables from the final model
-model_formula = formula(final_model_all)
-model_terms = terms(model_formula)
-model_variables = attr(model_terms, "term.labels")
-
-# Display the extracted variables
-print(model_variables)
-
-# Select variables to exclude from the final model by looking at the VIFs
-# We choose to exclude the variables with high VIF
-variables_to_exclude = c("BsmtFinType2")
-
-# Create a new formula with selected variables
-selected_formula = as.formula(paste("SalePrice ~", paste(setdiff(model_variables, variables_to_exclude), collapse = " + ")))
-
-# Fit a new model using the selected variables
-new_model = lm(selected_formula, df)
-# Display the summary of the new model
-summary(new_model)
-plot(new_model)
-vif(new_model)
-
-# Compare the two nested models using anova
-anova_result = anova(new_model, final_model_all)
-# Print the ANOVA table
-print(anova_result)
-
-# seems then reasonable to remove BsmtFinType2, since in this way we remove high VIF values and the ANOVA test suggests us to use the simpler model which doesn't include it
-
-# by looking at the mutual information matrix, ExterQual seems correlated to KitchenQual, let's try to remove ExterQual
-# Extracting variables from the final model
-model_formula = formula(new_model)
-model_terms = terms(model_formula)
-model_variables = attr(model_terms, "term.labels")
-variables_to_exclude = c("ExterQual")
-
-# Create a new formula with selected variables
-selected_formula = as.formula(paste("SalePrice ~", paste(setdiff(model_variables, variables_to_exclude), collapse = " + ")))
-
-# Fit a new model using the selected variables
-new_model2 = lm(selected_formula, df)
-# Display the summary of the new model
-summary(new_model2)
-plot(new_model2)
-vif(new_model2)
-
-# Compare the two nested models using anova
-anova_result = anova(new_model2, new_model)
-# Print the ANOVA table
-print(anova_result)
-
-# according to the ANOVA test, it seems that ExterQual is indeed significant in the model, so let's keep it for now
-
-# by looking at the VIF index and the mutual information matrix, SaleType and SaleCondition are very correlated to each other, let's remove one of them from the model new_model
-
-# Extracting variables from the final model
-model_formula = formula(new_model)
-model_terms = terms(model_formula)
-model_variables = attr(model_terms, "term.labels")
-variables_to_exclude = c("SaleType")
-
-# Create a new formula with selected variables
-selected_formula = as.formula(paste("SalePrice ~", paste(setdiff(model_variables, variables_to_exclude), collapse = " + ")))
-
-# Fit a new model using the selected variables
-new_model2 = lm(selected_formula, df)
-# Display the summary of the new model
-summary(new_model2)
-plot(new_model2)
-vif(new_model2)
-
-# Compare the two nested models using anova
-anova_result = anova(new_model2, new_model)
-# Print the ANOVA table
-print(anova_result)
-
-# according to the ANOVA test, it seems that the more complex model should be better but not that much: let's then remove SaleType
-
-# here are our covariates now
-# Extracting variables from the final model
-model_formula = formula(new_model2)
-model_terms = terms(model_formula)
-model_variables = attr(model_terms, "term.labels")
-# Display the extracted variables
-print(model_variables)
-
-# by looking at the correlation matrix, GarageCars and GarageArea are very correlated to each other, let's remove GarageCars
-variables_to_exclude = c("GarageCars")
-
-# Create a new formula with selected variables
-selected_formula = as.formula(paste("SalePrice ~", paste(setdiff(model_variables, variables_to_exclude), collapse = " + ")))
-
-# Fit a new model using the selected variables
-new_model2 = lm(selected_formula, df)
-# Display the summary of the new model
-summary(new_model2)
-plot(new_model2)
-vif(new_model2)
-
-# Compare the two nested models using anova
-anova_result = anova(new_model2, new_model)
-# Print the ANOVA table
-print(anova_result)
-
-# according to the ANOVA test, it seems that the more complex model should be better
-
-# ok these were some tests and attempts, now let's try to find the best model, hence the best combination of covariates to use for the linear models, with a more efficient and proficient way
-
-#!!!!!!!!!!!!
-#Definitive linear model approach
-#let's try another approach: exclude first the most correlated variables (really high correlation) from the dataset (by looking at the correlation matrix and the mutual information matrix) and then use the remaining variables to find the best model with the stepAIC procedure
-complete_model_all = lm(SalePrice ~ ., df) #model with all covariates, categorical and numerical
-summary(complete_model_all)
-# Extracting variables from the model
+# Model with all the covariates, categorical and numerical
+complete_model_all = lm(SalePrice ~ ., df)
+# Extracting the variables from the model
 model_formula = formula(complete_model_all)
 model_terms = terms(model_formula)
 model_variables = attr(model_terms, "term.labels")
+# Select the variables to exclude to avoid multicollinearity problems
 variables_to_exclude = c("SaleType", "GarageType", "ExterQual", "BsmtQual", "Neighborhood", "GarageCars", "MSSubClass", "LotFrontage", "OverallCond", "BsmtUnfSF", "X1stFlrSF", "TotRmsAbvGrd", "MasVnrType", "BsmtFinType2")
-# Create a new formula with selected variables
+# Create a new formula with the selected variables
 selected_formula = as.formula(paste("SalePrice ~", paste(setdiff(model_variables, variables_to_exclude), collapse = " + ")))
-
-complete_model = lm(selected_formula, df) #model with all remaining covariates
-
-final_model = stepAIC(complete_model, direction = "both", trace = F) #stepAIC for model selection starting from the model with all the remaining covariates
-summary(final_model) #print final model's info and check VIF
-plot(final_model)
-vif(final_model) # all <5
-hist(final_model$residuals, probability=T)
-
+# Model with all the remaining covariates
+complete_model = lm(selected_formula, df)
+# Use the stepAIC function to select the best model starting from the model with all the remaining covariates
+final_model = stepAIC(complete_model, direction = "both", trace = F)
+# Check VIF
+#vif(final_model) # RESULT: all < 4
 # Extracting variables from the final model
 model_formula = formula(final_model)
 model_terms = terms(model_formula)
 model_variables = attr(model_terms, "term.labels")
-# Display the extracted variables
-print(model_variables)
 
-# this model seems to be the best overall, since it doesn't have multicollinearity problems, has a good R^2 (even adjusted), almost equal to the one obtained with the other approach and is simpler, since it has less covariates
-
-# let's test it against the complete model (all remaining covariates after removing the correlated ones)
+# Let's test it against the complete model (all remaining covariates after removing the correlated ones)
 anova_result = anova(final_model, complete_model)
 # Print the ANOVA table
-print(anova_result)
+#print(anova_result)
+# The simpler model, with the covariates selected using stepAIC, is the one to choose, since it has a good balance between performance and complexity
 
-# the simpler model, with the covariates selected using the AIC as criteria, is the one to choose, since it has a good balance between performance and complexity
-
-# interaction terms would decrease the interpretability of the model and its complexity, so I think that there is no point to ass them, since the performance of the model is already good and adding interaction could cause overfitting and multi-collinearity problems
-
-
-# let's try to fit a LASSO model to see if we can remove some more covariates from the model shrinking them to zero
-#define response variable
+# Let's try to fit a LASSO model to see if we can remove some more covariates from the model shrinking them to zero
+# Define the response variable
 y <- df$SalePrice
-#define matrix of predictor variables
+# Define the matrix of predictor variables
 x <- data.matrix(df[, model_variables])
-#perform k-fold cross-validation to find optimal lambda value
+# Perform k-fold cross-validation to find the optimal lambda value
 cv_model <- cv.glmnet(x, y, alpha = 1)
-#find optimal lambda value that minimizes test MSE
+# Find the optimal lambda value that minimizes test MSE
 best_lambda <- cv_model$lambda.min
-#produce plot of test MSE by lambda value
-plot(cv_model)
-#find coefficients of best model
+# Find the coefficients of best model
 best_model <- glmnet(x, y, alpha = 1, lambda = best_lambda)
-coef(best_model)
-# seems that we can remove from the model the following covariates: LotShape, LandContour, GarageFinish, SaleCondition
-# let's try to fit a  new linear model removing these covariates then
+#coef(best_model)
+# It seems that we can remove from the model the following covariates: LotShape, LandContour, GarageFinish, SaleCondition
+# Let's try to fit a  new linear model removing these covariates
 variables_to_exclude = c("LotShape", "LandContour", "GarageFinish", "SaleCondition")
-# Create a new formula with selected variables
+# Create a new formula with the selected variables
 selected_formula = as.formula(paste("SalePrice ~", paste(setdiff(model_variables, variables_to_exclude), collapse = " + ")))
-
 try_model = lm(selected_formula, df)
-# let's again perform stepAIC to find the best model and maybe remove other more covariates
+# Let's again perform the stepAIC to find the best model and maybe remove other more covariates
 new_final_model = stepAIC(try_model, direction = "both", trace = F)
 summary(new_final_model) #print final model's info and check VIF
-plot(new_final_model)
-vif(new_final_model) # all <5
-hist(new_final_model$residuals)
+# Check VIF
+#vif(new_final_model) # all <4
 
 # Extracting variables from the final model
 model_formula = formula(new_final_model)
 model_terms = terms(model_formula)
 model_variables = attr(model_terms, "term.labels")
 # Display the extracted variables
-print(model_variables)
-
-# Let's try LASSO again with these variables
-x <- data.matrix(df[, model_variables])
-#perform k-fold cross-validation to find optimal lambda value
-cv_model <- cv.glmnet(x, y, alpha = 1)
-#find optimal lambda value that minimizes test MSE
-best_lambda <- cv_model$lambda.min
-#produce plot of test MSE by lambda value
-plot(cv_model)
-#find coefficients of best model
-best_model <- glmnet(x, y, alpha = 1, lambda = best_lambda)
-coef(best_model)
-# all the coefficients are different from zero, so with new_final_model we obtained the best model so far: it has good performance (comparable with the others) in terms of adjusted R^2 and it is the simplest model (less covariates), avoiding multicollinearity
-
+#print(model_variables)
 
 ```
+
+This liner model has $25$ predictors and *adjusted $R^2=0.8626$*; moreover, by looking at the p-values, we can see that the terms are in general statistically significant. We also computed the *variance inflation factor* (VIF) associated to each predictor to spot eventual collinearity and we obtained $VIF_j<4$ $\forall j$.
+
+Following this procedure, we therefore built a linear model which showcases a good trade-off between its performance and its complexity:
+
+- its covariates are selected to minimize the AIC;
+
+- its performance is good in terms of *adjusted $R^2$* (moreover, its $R^2$ is not far from the complete model's one, approximately equal to $0.88$);
+
+- it does not have multicollinearity problems;
+
+- we were able to simplify the model's structure by reducing the number of predictors, while maintaining consistent results in terms of the model's performance.
+
+```{r, fig.width=6, fig.height=4, echo=FALSE}
+plot(new_final_model, which = c(1))
+```
+
+By plotting the residuals against the fitted values, we can see that the linearity and the homeschedasticity assumptions are overall met; however, we can spot some outliers depending on the dataset.
+
+```{r, fig.width=6, fig.height=4, echo=FALSE}
+plot(new_final_model, which = c(2))
+```
+
+By looking at the qqplot, the normality assumption could be questioned; we tried to fit the model using the logarithm of the response variable to fix this problem, but it didn't improve the situation.
+
+We decided to not include interaction terms in our model, since they would have decreased its interpretability, increased its complexity (and hence the risk of overfitting and multicollinearity) and its performance was already satisfying
 
 ## Random Forest
 
@@ -596,6 +438,7 @@ In summary, while inter-node variance focuses on the variability between differe
 
 As we can see by the graph, a lot of variables selected with the analysis using linear models are the most important ones also for the Random Forest model.
 
+
 ```{r gam model, echo=FALSE}
 spline_model = gam(formula = SalePrice ~ LotArea + LandSlope + Condition1 + BldgType + 
     s(OverallQual) + s(YearBuilt) + s(YearRemodAdd) + RoofStyle + BsmtExposure + 
@@ -618,6 +461,7 @@ Our specific model is a small-sized multilayer perceptron (MLP) with three fully
 Instead of feeding all features in the dataset to the NN, we find that using the same variables picked for the GAM model leads to consistently better results.
 
 Here's the summary of the model:
+
 ```{r nn model, echo=FALSE, warning=FALSE}
 nn_variables <- c(
   "LotArea", "LandSlope", "Condition1", "BldgType",
