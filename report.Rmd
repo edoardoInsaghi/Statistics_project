@@ -18,10 +18,10 @@ knitr::opts_chunk$set(dev='pdf', echo = TRUE, warning=FALSE, error=FALSE)
 
 # Introduction
 
-This project aims to develop statistical models capable of predicting house sale prices from a set of covariates describing every aspect of the property.
+This project aims to develop statistical models capable of predicting house sale prices (it's then a regression task) from a set of covariates describing every aspect of the property.
 To do it we leverage the "House Prices - Advanced Regression Techniques" dataset from Kaggle @kaggledata. This dataset comprises 1460 samples of property sales situated in Ames, Iowa. For each one, 79 explanatory variables are collected, varying from the year of construction to the type of foundations used.
 
-We begin by exploring the data and doing the necessary preprocessing steps. After that, we simplify the data using a dimensionality reduction technique (PCA) to gain insights into how the target variable relates to other factors. Next, we suggest up to four statistical models: LM, GAM, RF, and a basic NN. We fine-tune each model and compare their behaviours using cross-validation since there is no predefined validation dataset at disposal.
+We begin by exploring the data and doing the necessary preprocessing steps. After that, we simplify the data using a dimensionality reduction technique (PCA) to gain insights into how the target variable relates to other factors. Next, we suggest up to four statistical models: LM, GAM, RF, and a basic NN. We didn't take into consideration generalised linear models such as the logistic regression or the Poisson regression because of the response variable's type. We fine-tune each model and compare their behaviours using cross-validation since there is no predefined validation dataset at disposal.
 
 ```{r libraries, echo=FALSE, results=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 library(dplyr)
@@ -181,7 +181,7 @@ When the number of covariates is high, it may be beneficial to put in place tech
 
 The elbowplot in the figure represents the proportion of the variance explained by each principal component. The results are not extremely exciting, because ideally we would like to see the first few principal components explaining the majority of the variance in our data, which is not what is happening here. 
 
-We then plotted the first four principal components against each other, highlighting the value of the Sale Price in the plots, looking for interesting patters. Apparently, only the first principal component seems to explain something about the response variable. The last plot includes the loadings of the variables on the first few principal components, here we are particularly interested in which variables contribute noticeably to the first component. These variables have to be observed closely since they are likely to influence the price of the house.
+We then plotted the first four principal components against each other, highlighting the value of the Sale Price in the plots, looking for interesting patterns. Apparently, only the first principal component seems to explain something about the response variable. The last plot includes the loadings of the variables on the first few principal components, here we are particularly interested in which variables contribute noticeably to the first component. These variables have to be observed closely since they are likely to influence the price of the house.
 
 ```{r dimensionality reduction, echo=FALSE, fig.width=8, fig.height=5}
 
@@ -280,7 +280,7 @@ m = ggcorrplot(mat) + labs(title="Mutual Information Matrix")
 m
 ```
 
-## Linear model
+## Linear Model
 
 In this paragraph we discuss the building process of the linear model we employed to predict the response variable `SalePrice`.
 
@@ -294,7 +294,7 @@ The AIC is a measure that balances the goodness of fit of a model with its compl
 
 The `stepAIC` function systematically adds or removes predictor variables from the model to find the combination that minimizes the AIC. The process involves iteratively fitting models, assessing their AIC, and deciding whether to add or remove variables based on the AIC improvement.
 
-The `stepAIC` function returned the model which minimized the AIC: this model consisted of $30$ covariates, so it was way less complex than the starting one; it showed good performance as well, since it had *adjusted $R^2=0.8696$*. We computed the *variance inflation factor* (VIF) associated to each predictor to spot eventual collinearity and we obtained $VIF_j<4$ $\forall j$ (way below the critical value $10$). Finally, the ANOVA suggested to keep this simpler model instead of the initial more complex one.
+The `stepAIC` function returned the model which minimized the AIC: this model consisted of $30$ covariates, so it was way less complex than the starting one; it showcased a good performance as well, since it had *adjusted $R^2=0.8696$*. We also computed the *variance inflation factor* (VIF) associated to each predictor to spot eventual collinearity and we obtained $VIF_j<4$ $\forall j$ (way below the critical value $10$). Finally, the ANOVA suggested to keep this simpler model instead of the initial more complex one.
 
 Indeed, we obtained a list of $30$ selected variables to use as covariates of our linear model. In order to simplify the model we got using the `stepAIC` function, we then tried to fit a LASSO model using these variables, to see if we could remove some more predictors by shrinking their coefficients to zero. 
 In this way we were able to exclude four more variables from our list of covariates; we then again used the `stepAIC` function starting from a linear model containing the remaining selected variables as predictors and obtained the following final linear model.
@@ -356,24 +356,29 @@ summary(new_final_model) #print final model's info and check VIF
 model_formula = formula(new_final_model)
 model_terms = terms(model_formula)
 model_variables = attr(model_terms, "term.labels")
-# Display the extracted variables
-#print(model_variables)
 
 ```
 
-This liner model has $25$ predictors and *adjusted $R^2=0.8626$*; moreover, by looking at the p-values, we can see that the terms are in general statistically significant. We also computed the *variance inflation factor* (VIF) associated to each predictor to spot eventual collinearity and we obtained $VIF_j<4$ $\forall j$.
+The variables we selected as covariates for the final linear model we developed are then the following ones:
+
+```{r, echo=FALSE}
+# Display the extracted variables
+print(model_variables)
+```
+
+We can underline the fact that some of these variables are the ones we noticed to contribute noticeably to the first component in the *dimensionality reduction* paragraph.
+
+This liner model has $25$ predictors and *adjusted $R^2=0.8626$*; moreover, by looking at the p-values in the model's summary, we can see that the terms are in general statistically significant. We also computed the *variance inflation factor* (VIF) associated to each predictor to spot eventual collinearity and we obtained $VIF_j<4$ $\forall j$.
 
 Following this procedure, we therefore built a linear model which showcases a good trade-off between its performance and its complexity:
 
 - its covariates are selected to minimize the AIC;
 
-- its performance is good in terms of *adjusted $R^2$* (moreover, its $R^2$ is not far from the complete model's one, approximately equal to $0.88$);
+- its performance is good in terms of *adjusted $R^2$* (moreover, its $R^2$ is not far from the complete model's one, which was approximately equal to $0.88$);
 
 - it does not have multicollinearity problems;
 
 - we were able to simplify the model's structure by reducing the number of predictors, while maintaining consistent results in terms of the model's performance.
-
-TO DO: ADD COMMENTS REGARDING CORRISPONDENCE OF THESE VARIABLES WITH THE ONES THAT EXPLAIN THE FIRST COMPONENT
 
 ```{r, fig.width=6, fig.height=4, echo=FALSE}
 plot(new_final_model, which = c(1))
@@ -387,7 +392,7 @@ plot(new_final_model, which = c(2))
 
 By looking at the qqplot, the normality assumption could be questioned; as already mentioned, we tried to fit the model using the logarithm of the response variable to fix this problem, but it didn't improve the situation.
 
-We decided to not include interaction terms in our model, since they would have decreased its interpretability, increased its complexity (and hence the risk of overfitting and multicollinearity) and its performance was already satisfying
+We decided to not include interaction terms in our linear model, since they would have decreased its interpretability, increased its complexity (and hence the risk of overfitting and multicollinearity) and its performance was already satisfying.
 
 ## Random Forest
 
