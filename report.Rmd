@@ -358,6 +358,8 @@ Following this procedure, we therefore built a linear model which showcases a go
 
 - we were able to simplify the model's structure by reducing the number of predictors, while maintaining consistent results in terms of the model's performance.
 
+TO DO: ADD COMMENTS REGARDING CORRISPONDENCE OF THESE VARIABLES WITH THE ONES THAT EXPLAIN THE FIRST COMPONENT
+
 ```{r, fig.width=6, fig.height=4, echo=FALSE}
 plot(new_final_model, which = c(1))
 ```
@@ -368,7 +370,7 @@ By plotting the residuals against the fitted values, we can see that the lineari
 plot(new_final_model, which = c(2))
 ```
 
-By looking at the qqplot, the normality assumption could be questioned; we tried to fit the model using the logarithm of the response variable to fix this problem, but it didn't improve the situation.
+By looking at the qqplot, the normality assumption could be questioned; as already mentioned, we tried to fit the model using the logarithm of the response variable to fix this problem, but it didn't improve the situation.
 
 We decided to not include interaction terms in our model, since they would have decreased its interpretability, increased its complexity (and hence the risk of overfitting and multicollinearity) and its performance was already satisfying
 
