@@ -18,7 +18,7 @@ knitr::opts_chunk$set(dev='pdf', echo = TRUE, warning=FALSE, error=FALSE)
 
 # Introduction
 
-This project aims to develop statistical models capable of predicting house sale prices (it's then a regression task) from a set of covariates describing every aspect of the property.
+This project aims to develop statistical models capable of predicting house sale prices from a set of covariates describing every aspect of the property.
 To do it we leverage the "House Prices - Advanced Regression Techniques" dataset from Kaggle @kaggledata. This dataset comprises 1460 samples of property sales situated in Ames, Iowa. For each one, 79 explanatory variables are collected, varying from the year of construction to the type of foundations used.
 
 We begin by exploring the data and doing the necessary preprocessing steps. After that, we simplify the data using a dimensionality reduction technique (PCA) to gain insights into how the target variable relates to other factors. Next, we suggest up to four statistical models: LM, GAM, RF, and a basic NN. We didn't take into consideration generalised linear models such as the logistic regression or the Poisson regression because of the response variable's type. We fine-tune each model and compare their behaviours using cross-validation since there is no predefined validation dataset at disposal.
@@ -55,9 +55,9 @@ tensorflow::set_random_seed(42)
 
 # Data Exploration
 
-The first step is to explore the data. As mentioned in the introduction, the dataset consists of 1460 observations and 79 covariates, which is a substantial number of variables, and poses the challenge of selecting which ones play a role in determining the response variable, and which do not.
+The first step is to explore the data. As mentioned in the introduction, the dataset consists of 1460 observations and 79 covariates, which is a substantial number of variables, and poses the challenge of selecting which ones play a relevant role in determining the response variable.
 
-The preprocessing of the data consisted in a number of steps: we first decided to remove from the dataset all the variables with an excessive number of NAs and fill those which had a reasonable amount of NAs (<100) with the mean or the mode of the remaining observations, depending on whether such variables were numerical or categorical. We then proceeded to scale the extremely right skewed numerical variables using a logarithmic transformation, which helps normalizing the variables and making them more easily explainable. Lastly, given the substantial number of categorical variables with dozens, if not hundreds, of categories, we decided to dump the least occurring variables into a separate category. This procedure helps keeping the degrees of freedom under control and makes the models more easily explainable.
+The preprocessing of the data consisted in a number of steps: we first decided to remove from the dataset all the variables with an excessive number of NAs and fill those which had a reasonable amount of NAs (<100) with the mean or the mode of the remaining observations, depending on whether such variables were numerical or categorical. We then proceeded to scale the extremely right skewed numerical variables using a logarithmic transformation, which helps normalizing the variables increasing the explainability of the models. Lastly, given the substantial number of categorical variables with dozens, if not hundreds, of categories, we decided to drop the least occurring ones into a separate category. This procedure helps keeping the degrees of freedom under control and makes the models easier to explain.
 
 ```{r pre processing, echo=FALSE, error=FALSE, warning=FALSE, include=FALSE}
 
@@ -134,9 +134,9 @@ df = df %>% select(-one_of(c(exclude, excludeNA))) %>% filter(TotalBsmtSF <= 600
 
 ```
 
-We also considered taking the logarithm of the response variable, which also appears to be right skewed, but this does not improve significantly the explanatory power of the models, and we therefore decided to leave it as it is preserving the interpretability of the models abiding by the principle expressed by the Occam's Razor. 
+We considered taking the logarithm of the response variable, which appears to be right skewed, but this does not improve significantly the explanatory power of the models. We therefore decided to not change it, preserving the interpretability of the models while adhering to Occam's Razor principle. 
 
-We observed the correlation matrix to explore how the numerical variables are related to each other and have a first look at how they are correlated to the response variable. We then show a few scatterplots of the response variables against some interesting covariate, looking for any sort of relationship with the house price.
+We observed the correlation matrix to explore how the numerical variables are related to each other and have a first look at how they are correlated to the response variable. We then show a few scatterplots of the response variable against some interesting covariates, looking for the relationship with the house price.
 
 ```{r numerical variables, echo=FALSE, warning=FALSE, message=FALSE, fig.width=8, fig.height=5}
 
@@ -177,11 +177,13 @@ c
 
 ## Dimensionality Reduction
 
-When the number of covariates is high, it may be beneficial to put in place techniques that aim at reducing the dimensionality of the dataset, while preserving as much information as possible. We decided to use the principal component analysis, a linear dimensionality reduction tool that works by projecting the data onto the eigenvectors of the covariance matrix of the data, to see whether the dataset can be summarized with less variables. 
+When the number of covariates is high, it may be beneficial to put in place techniques that aim at reducing the dimensionality of the dataset, while preserving as much information as possible. We decided to use principal component analysis, a linear dimensionality reduction tool that works by projecting the data onto the eigenvectors of its covariance matrix, in order to see whether the dataset can be summarized with less variables.
 
-The elbowplot in the figure represents the proportion of the variance explained by each principal component. The results are not extremely exciting, because ideally we would like to see the first few principal components explaining the majority of the variance in our data, which is not what is happening here. 
+The elbowplot in the figure represents the proportion of the variance explained by each principal component. The results are not extremely exciting, because ideally we would like to see the first few principal components explaining the majority of the variance in our data, which is not what is happening here.
 
-We then plotted the first four principal components against each other, highlighting the value of the Sale Price in the plots, looking for interesting patterns. Apparently, only the first principal component seems to explain something about the response variable. The last plot includes the loadings of the variables on the first few principal components, here we are particularly interested in which variables contribute noticeably to the first component. These variables have to be observed closely since they are likely to influence the price of the house.
+We then plotted the first four principal components against each other, highlighting the value of the Sale Price in the plots, looking for interesting patterns. Apparently, only the first principal component seems to explain something about the response variable.
+
+The last plot includes the loadings of the variables on the first few principal components, here we focus our attention on which variables contribute noticeably to the first component. These variables have to be observed closely since they are likely to influence the price of the house.
 
 ```{r dimensionality reduction, echo=FALSE, fig.width=8, fig.height=5}
 
@@ -250,7 +252,7 @@ z = ggplot(loadings, aes(x=substr(var, nchar(var)-2, nchar(var)), y=loading, fil
 z
 ```
 
-We concluded the exploratory analysis of the data by taking a look at the categorical variables. We plotted the boxplot of the Sale Price conditioned to every class of the categorical variables, looking for significant differences among them. For clarity we just decided to show the plots for some interesting covariates.
+We concluded the exploratory analysis of the data by taking a look at the categorical variables. We plotted the boxplot of the Sale Price conditioned to every class of the categorical variables, looking for significant differences among them. We show here a few of the plots, concerning the most interesting covariates.
 
 The last plot represents the mutual information matrix for the categorical covariates. It conveys information about the dependence between two variables, and we adopted it as a way of assessing correlation between these variables.
 
@@ -273,18 +275,11 @@ p6 = ggplot(data=catdf, aes(x=GarageFinish, y=SalePrice, fill=GarageFinish)) +
 p6
 ```
 
-```{r categorical variables2, echo=FALSE, fig.width=11, fig.height=8}
-# Mutual information matrix, allows to find correlations between categorical variables
-mat = mutinformation(catdf %>% select(!SalePrice))
-m = ggcorrplot(mat) + labs(title="Mutual Information Matrix")
-m
-```
-
 ## Linear Model
 
 In this paragraph we discuss the building process of the linear model we employed to predict the response variable `SalePrice`.
 
-The goal was to obtain a model showcasing a good trade-off between its performance and its complexity. In fact, since the dataset we had at disposal consisted of many different variables, the first task was to select among them the covariates to use for our model, by choosing the ones which would lead to better performances in terms of explained variability of the response variable (higher *adjusted $R^2$*). Moreover, we wanted the vast majority of the terms to be statistically significant and therefore, at the same time, we selected the covariates trying to avoid multicollinearity problems. Finally, in order to address the model's complexity, interpretability and to avoid overfitting, we simplified as much as possible the model's structure, while maintaining consistent results in terms of *adjusted $R^2$*.
+The goal was to obtain a model showcasing a good trade-off between performance and complexity. Since the dataset we had at disposal consisted of many different variables, the first task was to select among them the covariates to use for our model, by choosing the ones which would lead to better performances in terms of explained variability of the response variable (higher *adjusted $R^2$*). Moreover, we wanted the vast majority of the terms to be statistically significant and therefore, we pay attention to avoid multicollinearity problems. Finally, in order to address the model's complexity, interpretability and to avoid overfitting, we simplified as much as possible the model's structure, while maintaining consistent results in terms of *adjusted $R^2$*.
 
 In order to reduce from the beginning the risk of having multicollinearity problems, we first decided to remove from the dataset some variables which were highly correlated to/dependent from other variables; among a set of correlated variables, we kept in the dataset the one which was the most correlated to the response variable and therefore more useful to predict it. We then selected the covariates to remove by looking at the correlation matrix (for the numerical variables) and the mutual information matrix (for the categorical variables).
 
@@ -460,6 +455,7 @@ In summary, while inter-node variance focuses on the variability between differe
 
 As we can see by the graph, a lot of variables selected with the analysis using linear models are the most important ones also for the Random Forest model.
 
+## todo
 
 ```{r gam model, echo=FALSE}
 spline_model = gam(formula = SalePrice ~ LotArea + LandSlope + Condition1 + BldgType + 
@@ -482,7 +478,7 @@ Our specific model is a small-sized multilayer perceptron (MLP) with three fully
 
 Instead of feeding all features in the dataset to the NN, we find that using the same variables picked for the GAM model leads to consistently better results.
 
-Here's the summary of the model:
+Here's the architecture of the model:
 
 ```{r nn model, echo=FALSE, warning=FALSE}
 nn_variables <- c(
@@ -550,11 +546,11 @@ The batch normalization layers that appear in the summary are commonly used to s
 
 We can see from the summary that the model has a total of 2817 trainable parameters. As stated before the training is performed using SGD, in particular we use the Adam optimizer which is a stochastic gradient descent method that is based on adaptive estimation of first-order and second-order moments. As in other gradient descent methods we have to pick a learning rate, in our case we fix it to $1e-4$ and decrease it during training if the validation loss does not improve for a certain amount of epochs. As a loss function we use the Mean Squared Error (MSE).
 
-```{r}
-knitr::knit_exit()
-```
+# ```{r}
+# knitr::knit_exit()
+# ```
 
-```{r compare models, echo=FALSE}
+```{r compare models, echo=FALSE, messages=FALSE, warning=FALSE}
 # K fold CV
 numfolds = 10
 cv = createFolds(df$SalePrice, k=numfolds, list=TRUE)
@@ -666,4 +662,4 @@ res %>% ggplot(aes(y=rmse, x=model, fill=model)) + geom_boxplot()
 
 
 
-
+# References
