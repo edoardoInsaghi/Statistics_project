@@ -279,13 +279,13 @@ p6
 
 In this paragraph we discuss the building process of the linear model we employed to predict the response variable `SalePrice`.
 
-The goal was to obtain a model showcasing a good trade-off between performance and complexity. Since the dataset we had at disposal consisted of many different variables, the first task was to select among them the covariates to use for our model, by choosing the ones which would lead to better performances in terms of explained variability of the response variable (higher *adjusted $R^2$*). Moreover, we wanted the vast majority of the terms to be statistically significant and therefore, we pay attention to avoid multicollinearity problems. Finally, in order to address the model's complexity, interpretability and to avoid overfitting, we simplified as much as possible the model's structure, while maintaining consistent results in terms of *adjusted $R^2$*.
+The goal was to obtain a model showcasing a good trade-off between performance and complexity. Since the dataset we had at disposal consisted of many different variables, the first task was to select among them the covariates to use for our model, by choosing the ones which would lead to better performances in terms of explained variability of the response variable (higher *adjusted $R^2$*). Moreover, we wanted the vast majority of the terms to be statistically significant and therefore, we payed attention to avoid multicollinearity problems. Finally, in order to address the model's complexity, interpretability and to avoid overfitting, we simplified as much as possible the model's structure, while maintaining consistent results in terms of *adjusted $R^2$*.
 
 In order to reduce from the beginning the risk of having multicollinearity problems, we first decided to remove from the dataset some variables which were highly correlated to/dependent from other variables; among a set of correlated variables, we kept in the dataset the one which was the most correlated to the response variable and therefore more useful to predict it. We then selected the covariates to remove by looking at the correlation matrix (for the numerical variables) and the mutual information matrix (for the categorical variables).
 
 Starting from a linear model containing all the remaining variables in the dataset as covariates (*adjusted $R^2=0.8683$*), we used the `stepAIC` function (part of the `MASS` package) to select the linear model composed by the best combination of covariates with respect to the *AIC* (Akaike Information Criterion).
 
-The AIC is a measure that balances the goodness of fit of a model with its complexity, penalizing the models that are too complex: better fits correspond to smaller AIC values; the goal was to find a model that fitted the data well while avoiding overfitting.
+The AIC is a measure that balances the goodness of fit of a model with its complexity, penalizing the models that are too complex: better fits correspond to smaller AIC values.
 
 The `stepAIC` function systematically adds or removes predictor variables from the model to find the combination that minimizes the AIC. The process involves iteratively fitting models, assessing their AIC, and deciding whether to add or remove variables based on the AIC improvement.
 
@@ -379,7 +379,7 @@ Following this procedure, we therefore built a linear model which showcases a go
 plot(new_final_model, which = c(1))
 ```
 
-By plotting the residuals against the fitted values, we can see that the linearity and the homeschedasticity assumptions are overall met; however, we can spot some outliers depending on the dataset.
+By plotting the residuals against the fitted values, we can see that the linearity and the homeschedasticity assumptions are overall met; however, we can spot some outliers depending on the dataset. Moreover, we can notice that we obtain worse results as the fitted values increase: this could be due to the fact that our dataset (and therefore our model) don't contain variables which are useful to predict the prices of more expensive houses.
 
 ```{r, fig.width=6, fig.height=4, echo=FALSE}
 plot(new_final_model, which = c(2))
@@ -546,9 +546,15 @@ The batch normalization layers that appear in the summary are commonly used to s
 
 We can see from the summary that the model has a total of 2817 trainable parameters. As stated before the training is performed using SGD, in particular we use the Adam optimizer which is a stochastic gradient descent method that is based on adaptive estimation of first-order and second-order moments. As in other gradient descent methods we have to pick a learning rate, in our case we fix it to $1e-4$ and decrease it during training if the validation loss does not improve for a certain amount of epochs. As a loss function we use the Mean Squared Error (MSE).
 
-# ```{r}
-# knitr::knit_exit()
-# ```
+## Conclusions
+
+Having not utilized a separate test dataset since we weren't provided with one, we conducted the models' assessment phase using the cross-validation (CV) technique. The chosen CV method employs 10 folds, thus utilizing at each iteration 1314 observations for training and 146 for testing. We selected the RMSE as the assessment metric.
+
+Comparing the models, as evident from the graph, the Random Forest model outperforms the others. Despite the comparable median of the GAM to that of the Random Forest, the former exhibits higher variance. Conversely, the linear model, although with lower variance, presents a higher median compared to both GAM and Random Forest. The Neural Network, on the other hand, yields unsatisfactory results, probably because of the requirement of a larger amount of data than what was available in our dataset
+
+In conclusion, the Random Forest model emerges as the superior model in terms of RMSE among those analyzed.
+
+Another factor for evaluation is the explainability of the models. The linear model undoubtedly stands out in terms of explainability, followed by the GAM model. Conversely, the Random Forest model and above all the neural network are more challenging to visualize.
 
 ```{r compare models, echo=FALSE, messages=FALSE, warning=FALSE}
 # K fold CV
@@ -659,15 +665,5 @@ res = data.frame("rmse" = c(mse_linear, mse_gam, mse_rf, mse_nn),
 
 res %>% ggplot(aes(y=rmse, x=model, fill=model)) + geom_boxplot()
 ```
-
-# Conclusion
-
-Having not utilized a separate test dataset, we conducted model assessment using the cross-validation technique. The chosen cross-validation method employs 10 folds, thus utilizing 1314 observations for training and 146 for testing. We selected RMSE as the assessment metric.
-
-As evident from the graph, the Random Forest model outperforms others. Despite the comparable median of the GAM to that of the Random Forest, the former exhibits high variance. Conversely, the linear model, although with lower variance, presents a higher median compared to both GAM and Random Forest. The Neural Network, on the other hand, yields unsatisfactory results, attributed to the requirement of a larger dataset size than what is available in our dataset.
-
-In conclusion, the Random Forest model emerges as the superior model in terms of RMSE among those analyzed.
-
-Another factor for evaluation is the explainability of the model. The linear model undoubtedly stands out in terms of explainability, followed by the GAM model. Conversely, the Random Forest model and the neural network are challenging to visualize.
 
 # References
