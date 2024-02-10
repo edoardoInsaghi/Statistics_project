@@ -660,6 +660,14 @@ res = data.frame("rmse" = c(mse_linear, mse_gam, mse_rf, mse_nn),
 res %>% ggplot(aes(y=rmse, x=model, fill=model)) + geom_boxplot()
 ```
 
+# Conclusion
 
+Having not utilized a separate test dataset, we conducted model assessment using the cross-validation technique. The chosen cross-validation method employs 10 folds, thus utilizing 1314 observations for training and 146 for testing. We selected RMSE as the assessment metric.
+
+As evident from the graph, the Random Forest model outperforms others. Despite the comparable median of the GAM to that of the Random Forest, the former exhibits high variance. Conversely, the linear model, although with lower variance, presents a higher median compared to both GAM and Random Forest. The Neural Network, on the other hand, yields unsatisfactory results, attributed to the requirement of a larger dataset size than what is available in our dataset.
+
+In conclusion, the Random Forest model emerges as the superior model in terms of RMSE among those analyzed.
+
+Another factor for evaluation is the explainability of the model. The linear model undoubtedly stands out in terms of explainability, followed by the GAM model. Conversely, the Random Forest model and the neural network are challenging to visualize.
 
 # References
