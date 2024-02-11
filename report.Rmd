@@ -21,7 +21,7 @@ knitr::opts_chunk$set(dev='pdf', echo = TRUE, warning=FALSE, error=FALSE)
 This project aims to develop statistical models capable of predicting house sale prices from a set of covariates describing every aspect of the property.
 To do it we leverage the "House Prices - Advanced Regression Techniques" dataset from Kaggle @kaggledata. This dataset comprises 1460 samples of property sales situated in Ames, Iowa. For each one, 79 explanatory variables are collected, varying from the year of construction to the type of foundations used.
 
-We begin by exploring the data and doing the necessary preprocessing steps. After that, we simplify the data using a dimensionality reduction technique (PCA) to gain insights into how the target variable relates to other factors. Next, we suggest up to four statistical models: LM, GAM, RF, and a basic NN. We didn't take into consideration generalised linear models such as the logistic regression or the Poisson regression because of the response variable's type. We fine-tune each model and compare their behaviours using cross-validation since there is no predefined validation dataset at disposal.
+We begin by exploring the data and doing the necessary preprocessing steps. After that, we simplify the data using a dimensionality reduction technique (PCA) to gain insights into how the target variable relates to other factors. Next, we suggest up to four statistical models: LM, GAM, RF, and a basic NN. We performed some tests with Generalized Linear Models using the Gamma distribution as well but did not obtain good results. We fine-tune each model and compare their behaviours using cross-validation since there is no predefined validation dataset at disposal.
 
 ```{r libraries, echo=FALSE, results=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 library(dplyr)
@@ -185,7 +185,7 @@ We then plotted the first four principal components against each other, highligh
 
 The last plot includes the loadings of the variables on the first few principal components, here we focus our attention on which variables contribute noticeably to the first component. These variables have to be observed closely since they are likely to influence the price of the house.
 
-```{r dimensionality reduction, echo=FALSE, fig.width=8, fig.height=5}
+```{r dimensionality reduction, echo=FALSE, fig.width=8, fig.height=4}
 
 ndim = 4 # the dimension of the space onto which the data is projected
 # both pca and UMAP, could be different between them
@@ -207,7 +207,7 @@ elbow_plot = data.frame("PC"=seq_along(r2), "ExplainedVar"=r2) %>%
 elbow_plot
 ```
 
-```{r dimensionality reduction2, echo=FALSE, fig.width=12, fig.height=8}
+```{r dimensionality reduction2, echo=FALSE, fig.width=12, fig.height=7}
 # plots of projected data
 proj = as.data.frame(pca$x[,1:ndim])
 proj$SalePrice = scaledSalePrice
@@ -222,6 +222,9 @@ plots = lapply(1:(ndim-1), function(k){
 
 disp = wrap_plots(unlist(plots, recursive=FALSE))
 disp
+```
+
+```{r dimensionality reduction3,echo=FALSE, fig.width=12, fig.height=9}
 
 # The results of the pca made me a little sad :(, only the first component
 # seems to explain something in the Sales Prices. This probably foreshadows that
@@ -376,13 +379,13 @@ Following this procedure, we therefore built a linear model which showcases a go
 - we were able to simplify the model's structure by reducing the number of predictors, while maintaining consistent results in terms of the model's performance.
 
 ```{r, fig.width=6, fig.height=4, echo=FALSE}
-plot(new_final_model, which = c(1))
+plot(new_final_model, which = c(1), sub.caption=" ")
 ```
 
 By plotting the residuals against the fitted values, we can see that the linearity and the homeschedasticity assumptions are overall met; however, we can spot some outliers depending on the dataset. Moreover, we can notice that we obtain worse results as the fitted values increase: this could be due to the fact that our dataset (and therefore our model) don't contain variables which are useful to predict the prices of more expensive houses.
 
 ```{r, fig.width=6, fig.height=4, echo=FALSE}
-plot(new_final_model, which = c(2))
+plot(new_final_model, which = c(2), sub.caption=" ")
 ```
 
 By looking at the qqplot, the normality assumption could be questioned; as already mentioned, we tried to fit the model using the logarithm of the response variable to fix this problem, but it didn't improve the situation.
@@ -455,7 +458,12 @@ In summary, while inter-node variance focuses on the variability between differe
 
 As we can see by the graph, a lot of variables selected with the analysis using linear models are the most important ones also for the Random Forest model.
 
-## todo
+## GAM Model
+
+We decided to improve the simple linear model using a Generalized Additive Model, which allows for more complex interactions between the covariates and the sale price.
+We started by taking the linear model and added smoothing splines to the variables in the model for which a linear fit did not seem appropriate. We kept the ones which resulted statistically significant and contributed to increase the adjusted R^2 of the model.
+We then proceeded to do the same with the variable that previously did not explain the response variable, and decided whether to include them basing our decision on the outcome of an ANOVA test.
+With this procedure we manage to obtain an R^2 above 0.9, which is a noticeable improvement from the linear model.
 
 ```{r gam model, echo=FALSE}
 spline_model = gam(formula = SalePrice ~ LotArea + LandSlope + Condition1 + BldgType + 
@@ -550,13 +558,14 @@ We can see from the summary that the model has a total of 2817 trainable paramet
 
 Having not utilized a separate test dataset since we weren't provided with one, we conducted the models' assessment phase using the cross-validation (CV) technique. The chosen CV method employs 10 folds, thus utilizing at each iteration 1314 observations for training and 146 for testing. We selected the RMSE as the assessment metric.
 
-Comparing the models, as evident from the graph, the Random Forest model outperforms the others. Despite the comparable median of the GAM to that of the Random Forest, the former exhibits higher variance. Conversely, the linear model, although with lower variance, presents a higher median compared to both GAM and Random Forest. The Neural Network, on the other hand, yields unsatisfactory results, probably because of the requirement of a larger amount of data than what was available in our dataset
+Comparing the models, as evident from the graph, the Random Forest model outperforms the others. Despite the comparable median of the GAM to that of the Random Forest, the former exhibits higher variance. Conversely, the linear model, although with lower variance, presents a higher median compared to both GAM and Random Forest. The Neural Network, on the other hand, yields unsatisfactory results, probably because of the requirement of a larger amount of data than what was available in our dataset.
 
 In conclusion, the Random Forest model emerges as the superior model in terms of RMSE among those analyzed.
 
 Another factor for evaluation is the explainability of the models. The linear model undoubtedly stands out in terms of explainability, followed by the GAM model. Conversely, the Random Forest model and above all the neural network are more challenging to visualize.
 
-```{r compare models, echo=FALSE, messages=FALSE, warning=FALSE}
+```{r compare models, echo=FALSE, warning=FALSE,message=FALSE,error=FALSE, results='hide', fig.keep='all'}
+
 # K fold CV
 numfolds = 10
 cv = createFolds(df$SalePrice, k=numfolds, list=TRUE)
@@ -585,9 +594,9 @@ for (fold in 1:numfolds){
       s(BsmtFinSF1) + BsmtFinSF2 + TotalBsmtSF + HeatingQC + LowQualFinSF + s(TotRmsAbvGrd) + 
       GrLivArea + BedroomAbvGr +  KitchenQual + Functional + Fireplaces + s(GarageArea) + 
       s(ScreenPorch) + s(MasVnrArea) + s(X1stFlrSF) + s(X2ndFlrSF) + BsmtQual + CentralAir,
-      data = train)
+      data=train)
   
-  rf_model <- randomForest(SalePrice ~ ., data = train, ntree = 1000, importance = FALSE)
+  rf_model <- randomForest(SalePrice ~ ., data = train, ntree = 500, importance = FALSE)
     
   # nn preprocessing
   nn_variables <- c(
