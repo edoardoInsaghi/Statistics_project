@@ -128,6 +128,7 @@ df[] = lapply(df, function(x) {
 
 conflict_prefer("select", "dplyr")
 conflict_prefer("filter", "dplyr")
+conflict_prefer("train", "caret")
 
 # Removing very imbalanced covariates and also some values full of NA 
 exclude = c("Id", "Street", "Utilities", "Condition2", "RoofMatl", 
@@ -471,16 +472,16 @@ glm_model <- glm(formula = SalePrice ~ LotArea + LandSlope + Condition1 + BldgTy
     RoofStyle + BsmtExposure + BsmtFinSF1 + BsmtFinSF2 + TotalBsmtSF + HeatingQC + LowQualFinSF +
     GrLivArea + BsmtFullBath + BedroomAbvGr + KitchenAbvGr + KitchenQual + Functional + Fireplaces +  
     GarageArea + WoodDeckSF + ScreenPorch + PoolArea + YearBuilt + YearRemodAdd,
-              data = train, family = Gamma(link = "log"))
+              data = df, family = Gamma(link = "log"))
 summary(glm_model)
 ```
 
 ## GAM Model
 
-We decided to improve the simple linear model using a Generalized Additive Model, which allows for more complex interactions between the covariates and the sale price.
-We started by taking the linear model and added smoothing splines to the variables in the model for which a linear fit did not seem appropriate. We kept the ones which resulted statistically significant and contributed to increase the adjusted R^2 of the model.
+We decided to improve the Generalized linear model by using a Generalized Additive Model, which allows for more complex interactions between the covariates and the sale price.
+We started by taking the GLM model and added smoothing splines to the variables in the model for which a linear fit did not seem appropriate. We kept the ones which resulted statistically significant and contributed to increase the adjusted R^2 of the model.
 We then proceeded to do the same with the variable that previously did not explain the response variable, and decided whether to include them basing our decision on the outcome of an ANOVA test.
-With this procedure we manage to obtain an R^2 above 0.9, which is a noticeable improvement from the linear model.
+With this procedure we manage to obtain an adjusted R^2 of around 0.9, which is a noticeable improvement from the linear model.
 
 ```{r gam model, echo=FALSE}
 spline_model = gam(formula = SalePrice ~ LotArea + LandSlope + Condition1 + BldgType + 
@@ -488,7 +489,7 @@ spline_model = gam(formula = SalePrice ~ LotArea + LandSlope + Condition1 + Bldg
     s(BsmtFinSF1) + BsmtFinSF2 + TotalBsmtSF + HeatingQC + LowQualFinSF + s(TotRmsAbvGrd) + 
     GrLivArea + BedroomAbvGr +  KitchenQual + Functional + Fireplaces + s(GarageArea) + 
     s(ScreenPorch) + s(MasVnrArea) + s(X1stFlrSF) + s(X2ndFlrSF) + BsmtQual + CentralAir,
-    data = df)
+    data = df, family = Gamma(link = "log"))
 
 summary(spline_model)
 ```
@@ -612,7 +613,7 @@ for (fold in 1:numfolds){
       s(BsmtFinSF1) + BsmtFinSF2 + TotalBsmtSF + HeatingQC + LowQualFinSF + s(TotRmsAbvGrd) + 
       GrLivArea + BedroomAbvGr +  KitchenQual + Functional + Fireplaces + s(GarageArea) + 
       s(ScreenPorch) + s(MasVnrArea) + s(X1stFlrSF) + s(X2ndFlrSF) + BsmtQual + CentralAir,
-      data=train)
+      data=train, family = Gamma(link = "log"))
   
   glm_model <- glm(formula = SalePrice ~ LotArea + LandSlope + Condition1 + BldgType + OverallQual + 
       RoofStyle + BsmtExposure + BsmtFinSF1 + BsmtFinSF2 + TotalBsmtSF + HeatingQC + LowQualFinSF +
@@ -678,7 +679,7 @@ for (fold in 1:numfolds){
   
   nn_predictions = nn_model %>% predict(test_data_nn) * (max_lab_train - min_lab_train) + min_lab_train
   lm_predictions = predict(linear_model, newdata=test)
-  gam_predictions = predict(gam_model, newdata=test)
+  gam_predictions = predict(gam_model, newdata=test, type='response')
   rf_predictions = predict(rf_model, newdata=test)
   glm_predictions = predict(glm_model, newdata=test, type='response')
 
