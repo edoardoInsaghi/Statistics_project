@@ -21,7 +21,7 @@ knitr::opts_chunk$set(dev='pdf', echo = TRUE, warning=FALSE, error=FALSE)
 This project aims to develop statistical models capable of predicting house sale prices from a set of covariates describing every aspect of the property.
 To do it we leverage the "House Prices - Advanced Regression Techniques" dataset from Kaggle @kaggledata. This dataset comprises 1460 samples of property sales situated in Ames, Iowa. For each one, 79 explanatory variables are collected, varying from the year of construction to the type of foundations used.
 
-We begin by exploring the data and doing the necessary preprocessing steps. After that, we simplify the data using a dimensionality reduction technique (PCA) to gain insights into how the target variable relates to other factors. Next, we suggest up to four statistical models: LM, GAM, RF, and a basic NN. We performed some tests with Generalized Linear Models using the Gamma distribution as well but did not obtain good results. We fine-tune each model and compare their behaviours using cross-validation since there is no predefined validation dataset at disposal.
+We begin by exploring the data and doing the necessary preprocessing steps. After that, we simplify the data using a dimensionality reduction technique (PCA) to gain insights into how the target variable relates to other factors. Next, we suggest up to five statistical models: LM, GAM, GLM, RF, and a basic NN. We fine-tune each model and compare their behaviours using cross-validation since there is no predefined validation dataset at disposal.
 
 ```{r libraries, echo=FALSE, results=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 library(dplyr)
@@ -45,6 +45,10 @@ library(mgcv)
 library(conflicted)
 library(MASS)
 library(glmnet)
+
+library(reticulate)
+use_virtualenv("~/.virtualenvs/r-tensorflow/")
+
 library(keras)
 library(tensorflow)
 library(car)
@@ -458,6 +462,19 @@ In summary, while inter-node variance focuses on the variability between differe
 
 As we can see by the graph, a lot of variables selected with the analysis using linear models are the most important ones also for the Random Forest model.
 
+## GLM Model
+
+TODO: Uses same formula as linear model.
+
+```{r glm model}
+glm_model <- glm(formula = SalePrice ~ LotArea + LandSlope + Condition1 + BldgType + OverallQual + 
+    RoofStyle + BsmtExposure + BsmtFinSF1 + BsmtFinSF2 + TotalBsmtSF + HeatingQC + LowQualFinSF +
+    GrLivArea + BsmtFullBath + BedroomAbvGr + KitchenAbvGr + KitchenQual + Functional + Fireplaces +  
+    GarageArea + WoodDeckSF + ScreenPorch + PoolArea + YearBuilt + YearRemodAdd,
+              data = train, family = Gamma(link = "log"))
+summary(glm_model)
+```
+
 ## GAM Model
 
 We decided to improve the simple linear model using a Generalized Additive Model, which allows for more complex interactions between the covariates and the sale price.
@@ -574,6 +591,7 @@ mse_linear = vector(mode="numeric", length=numfolds)
 mse_gam = vector(mode="numeric", length=numfolds)
 mse_rf = vector(mode="numeric", length=numfolds)
 mse_nn = vector(mode="numeric", length=numfolds)
+mse_glm = vector(mode="numeric", length=numfolds)
 
 for (fold in 1:numfolds){
   train_idx = unlist(cv[-fold])
@@ -595,6 +613,12 @@ for (fold in 1:numfolds){
       GrLivArea + BedroomAbvGr +  KitchenQual + Functional + Fireplaces + s(GarageArea) + 
       s(ScreenPorch) + s(MasVnrArea) + s(X1stFlrSF) + s(X2ndFlrSF) + BsmtQual + CentralAir,
       data=train)
+  
+  glm_model <- glm(formula = SalePrice ~ LotArea + LandSlope + Condition1 + BldgType + OverallQual + 
+      RoofStyle + BsmtExposure + BsmtFinSF1 + BsmtFinSF2 + TotalBsmtSF + HeatingQC + LowQualFinSF +
+      GrLivArea + BsmtFullBath + BedroomAbvGr + KitchenAbvGr + KitchenQual + Functional + Fireplaces +  
+      GarageArea + WoodDeckSF + ScreenPorch + PoolArea + YearBuilt + YearRemodAdd,
+                data = train, family = Gamma(link = "log"))
   
   rf_model <- randomForest(SalePrice ~ ., data = train, ntree = 500, importance = FALSE)
     
@@ -656,21 +680,25 @@ for (fold in 1:numfolds){
   lm_predictions = predict(linear_model, newdata=test)
   gam_predictions = predict(gam_model, newdata=test)
   rf_predictions = predict(rf_model, newdata=test)
+  glm_predictions = predict(glm_model, newdata=test, type='response')
 
   linear_rmse <- sqrt(mean((test$SalePrice - lm_predictions)^2))
   gam_rmse <- sqrt(mean((test$SalePrice - gam_predictions)^2))
   nn_rmse <- sqrt(mean((test$SalePrice - nn_predictions)^2))
   rf_rmse <- sqrt(mean((test$SalePrice - rf_predictions)^2))
+  glm_rmse <- sqrt(mean((test$SalePrice - glm_predictions)^2))
 
   mse_linear[fold] = linear_rmse
   mse_gam[fold] = gam_rmse
   mse_nn[fold] = nn_rmse
   mse_rf[fold] = rf_rmse
+  mse_glm[fold] = glm_rmse
 }
 
-res = data.frame("rmse" = c(mse_linear, mse_gam, mse_rf, mse_nn),
-                 "model" = c(rep("Linear", numfolds), rep("Gam", numfolds),
-                             rep("RF", numfolds), rep("NN", numfolds)))
+res = data.frame("rmse" = c(mse_linear, mse_glm, mse_gam, mse_rf, mse_nn),
+                 "model" = c(rep("Linear", numfolds), rep("GLM", numfolds),
+                             rep("Gam", numfolds), rep("RF", numfolds),
+                             rep("NN", numfolds)))
 
 res %>% ggplot(aes(y=rmse, x=model, fill=model)) + geom_boxplot()
 ```
