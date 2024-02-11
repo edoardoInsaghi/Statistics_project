@@ -576,11 +576,13 @@ We can see from the summary that the model has a total of 2817 trainable paramet
 
 Having not utilized a separate test dataset since we weren't provided with one, we conducted the models' assessment phase using the cross-validation (CV) technique. The chosen CV method employs 10 folds, thus utilizing at each iteration 1314 observations for training and 146 for testing. We selected the RMSE as the assessment metric.
 
-Comparing the models, as evident from the graph, the Random Forest model outperforms the others. Despite the comparable median of the GAM to that of the Random Forest, the former exhibits higher variance. Conversely, the linear model, although with lower variance, presents a higher median compared to both GAM and Random Forest. The Neural Network, on the other hand, yields unsatisfactory results, probably because of the requirement of a larger amount of data than what was available in our dataset.
+Comparing the models, as evident from the graph, the GLM model outperforms the others.
 
-In conclusion, the Random Forest model emerges as the superior model in terms of RMSE among those analyzed.
+Despite the comparable median of the GAM and the Random Forest to that of the GLM, the formers exhibit higher variance. Conversely, the linear model, although with lower variance, presents a higher median compared to both GAM and Random Forest. The Neural Network, on the other hand, yields unsatisfactory results, probably because of the requirement of a larger amount of data than what was available in our dataset.
 
-Another factor for evaluation is the explainability of the models. The linear model undoubtedly stands out in terms of explainability, followed by the GAM model. Conversely, the Random Forest model and above all the neural network are more challenging to visualize.
+In conclusion, the GLM model emerges as the superior model in terms of RMSE among those analyzed.
+
+Another factor for evaluation is the explainability of the models. The linear model and the GLM undoubtedly stand out in terms of explainability, followed by the GAM model. Conversely, the Random Forest model and above all the neural network are more challenging to visualize.
 
 ```{r compare models, echo=FALSE, warning=FALSE,message=FALSE,error=FALSE, results='hide', fig.keep='all'}
 
