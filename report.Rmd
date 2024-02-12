@@ -1,6 +1,7 @@
 ---
 title: |
-  | Statistical Methods - Final Project:
+  | Statistical Methods
+  | Final Project Group F:
   | House Prices - Regressing Sales Price
 author:
   - Donninelli Adriano
@@ -21,7 +22,7 @@ knitr::opts_chunk$set(dev='pdf', echo = TRUE, warning=FALSE, error=FALSE)
 This project aims to develop statistical models capable of predicting house sale prices from a set of covariates describing every aspect of the property.
 To do it we leverage the "House Prices - Advanced Regression Techniques" dataset from Kaggle @kaggledata. This dataset comprises 1460 samples of property sales situated in Ames, Iowa. For each one, 79 explanatory variables are collected, varying from the year of construction to the type of foundations used.
 
-We begin by exploring the data and doing the necessary preprocessing steps. After that, we simplify the data using a dimensionality reduction technique (PCA) to gain insights into how the target variable relates to other factors. Next, we suggest up to five statistical models: LM, GAM, GLM, RF, and a basic NN. We fine-tune each model and compare their behaviours using cross-validation since there is no predefined validation dataset at disposal.
+We begin by exploring the data and doing the necessary preprocessing steps. After that, we simplify the data using a dimensionality reduction technique (PCA) to gain insights into how the target variable relates to other factors. Next, we suggest up to five statistical models: LM, GLM, GAM, RF, and a basic NN. We fine-tune each model and compare their behaviours using cross-validation since there is no predefined validation dataset at disposal.
 
 ```{r libraries, echo=FALSE, results=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 library(dplyr)
@@ -476,6 +477,14 @@ glm_model <- glm(formula = SalePrice ~ LotArea + LandSlope + Condition1 + BldgTy
     GarageArea + WoodDeckSF + ScreenPorch + PoolArea + YearBuilt + YearRemodAdd,
               data = df, family = Gamma(link = "log"))
 summary(glm_model)
+
+summary_info <- summary(glm_model)
+residual_deviance <- summary_info$deviance
+null_deviance <- summary_info$null.deviance
+r_squared <- 1 - (residual_deviance / null_deviance)
+
+# Print the adjusted R²
+cat("R-squared:", r_squared, "\n")
 ```
 
 ```{r, fig.width=6, fig.height=4, echo=FALSE}
@@ -487,14 +496,11 @@ hist(glm_model$residuals, probability = T, main = "Histogram vs Density")
 curve(dnorm(x, mean = mean(glm_model$residuals), sd = sd(glm_model$residuals)), add = TRUE, col = "black", lwd = 2)
 ```
 
-
-
 ## GAM Model
 
-We decided to improve the Generalized linear model by using a Generalized Additive Model, which allows for more complex interactions between the covariates and the sale price.
-We started by taking the GLM model and added smoothing splines to the variables in the model for which a linear fit did not seem appropriate. We kept the ones which resulted statistically significant and contributed to increase the adjusted R^2 of the model.
+For completeness we decided to try to improve the GLM by using a Generalized Additive Model, which allows for more complex interactions between the covariates and the sale price. We started by taking the GLM model and added smoothing splines to the variables in the model for which a linear fit did not seem appropriate. We kept the ones which resulted statistically significant and contributed to a valuable increase in the R^2 of the model.
 We then proceeded to do the same with the variable that previously did not explain the response variable, and decided whether to include them basing our decision on the outcome of an ANOVA test.
-With this procedure we manage to obtain an adjusted R^2 of around 0.9, which is a noticeable improvement from the linear model.
+With this procedure we manage to obtain an R^2 of 0.913, which is a small improvement over the GLM.
 
 ```{r gam model, echo=FALSE}
 spline_model = gam(formula = SalePrice ~ LotArea + LandSlope + Condition1 + BldgType + 
@@ -515,7 +521,7 @@ The network is structured in layers, with the input layer receiving the input, a
 
 Our specific model is a small-sized multilayer perceptron (MLP) with three fully connected layers. After some architecture tuning, we set the first and second layers to have 32 neurons each, while the last layer, predicting the scalar output variable, consists of a single neuron. In order to stabilize training we normalize all numerical features to lie in the $[0, 1]$ range. The categorical variables on the other hand are one-hot encoded before feeding to the network. All layers use the sigmoid (inverse logit) non linear activation function.
 
-Instead of feeding all features in the dataset to the NN, we find that using the same variables picked for the GAM model leads to consistently better results.
+Instead of feeding all features in the dataset to the NN, we find that using the same variables we picked for the GAM model leads to consistently better results, especially reducing overfitting during the training.
 
 Here's the architecture of the model:
 
