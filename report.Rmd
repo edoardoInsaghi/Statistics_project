@@ -591,18 +591,6 @@ The batch normalization layers that appear in the summary are commonly used to s
 
 We can see from the summary that the model has a total of 2817 trainable parameters. As stated before the training is performed using SGD, in particular we use the Adam optimizer which is a stochastic gradient descent method that is based on adaptive estimation of first-order and second-order moments. As in other gradient descent methods we have to pick a learning rate, in our case we fix it to $1e-4$ and decrease it during training if the validation loss does not improve for a certain amount of epochs. As a loss function we use the Mean Squared Error (MSE).
 
-## Results and Conclusions
-
-Having not utilized a separate test dataset since we weren't provided with one, we conducted the models' assessment phase using the cross-validation (CV) technique. The chosen CV method employs 10 folds, thus utilizing at each iteration 1314 observations for training and 146 for testing. We selected the RMSE as the assessment metric.
-
-Comparing the models, as evident from the graph, the GLM model outperforms the others.
-
-Despite the comparable median of the GAM and the Random Forest to that of the GLM, the formers exhibit higher variance. Conversely, the linear model, although with lower variance, presents a higher median compared to both GAM and Random Forest. The Neural Network, on the other hand, yields unsatisfactory results, probably because of the requirement of a larger amount of data than what was available in our dataset.
-
-In conclusion, the GLM model emerges as the superior model in terms of RMSE among those analyzed.
-
-Another factor for evaluation is the explainability of the models. The linear model and the GLM undoubtedly stand out in terms of explainability, followed by the GAM model. Conversely, the Random Forest model and above all the neural network are more challenging to visualize.
-
 ```{r compare models, echo=FALSE, warning=FALSE,message=FALSE,error=FALSE, results='hide', fig.keep='all'}
 
 # K fold CV
@@ -724,5 +712,19 @@ res = data.frame("rmse" = c(mse_linear, mse_glm, mse_gam, mse_rf, mse_nn),
 
 res %>% ggplot(aes(y=rmse, x=model, fill=model)) + geom_boxplot()
 ```
+
+## Results and Conclusions
+
+Having not utilized a separate test dataset, we conducted the models' assessment phase using the cross-validation (CV) technique. The chosen CV method employs 10 folds, thus utilizing at each iteration 1314 observations for training and 146 for testing. We selected the RMSE as the assessment metric.
+
+Comparing the models, as evident from the graph, the GLM model outperforms the others.
+
+Despite the comparable median of the GAM and the Random Forest to that of the GLM, the formers exhibit higher variance. Conversely, the linear model, although with lower variance, presents a higher median compared to both GAM and Random Forest. The Neural Network, on the other hand, yields unsatisfactory results, probably because of the requirement of a larger amount of data than what was available in our dataset.
+
+Besides having the lowest median RMSE among the analyzed models, the GLM also proves to be by far the most consistent model. This makes it the most useful model for solving our problem.
+
+In conclusion, the GLM emerges as the superior model in terms of RMSE among those analyzed.
+
+Another factor for evaluation is the explainability of the models. The linear model and the GLM undoubtedly stand out in terms of explainability, followed by the GAM. Conversely, the Random Forest model and above all the neural network are more challenging to visualize.
 
 # References
