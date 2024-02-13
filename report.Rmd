@@ -156,10 +156,6 @@ h
 
 numdf = df %>% select_if(is.numeric)
 
-p1 = ggplot(data=numdf, aes(x=LotArea, y=SalePrice)) + geom_point() + 
-  geom_smooth(method="loess") + theme_bw()
-p1
-
 p2 = ggplot(data=numdf, aes(x=OverallQual, y=SalePrice)) + geom_point() + 
   geom_smooth(method="loess") + theme_bw()
 p2
@@ -278,10 +274,6 @@ p4
 p5 = ggplot(data=catdf, aes(x=KitchenQual, y=SalePrice, fill=KitchenQual)) + 
   geom_boxplot() + scale_fill_viridis(option=color, discrete=TRUE) + theme_bw()
 p5
-
-p6 = ggplot(data=catdf, aes(x=GarageFinish, y=SalePrice, fill=GarageFinish)) + 
-  geom_boxplot() + scale_fill_viridis(option=color, discrete=TRUE) + theme_bw()
-p6
 ```
 
 ## Linear Model
